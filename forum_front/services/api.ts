@@ -1,7 +1,9 @@
 import axios from 'axios'
 import type { ApiResponse, LoginRequest, RegisterRequest, LoginResponse, PostListDTO, PostDetailDTO, CreatePost, PatchPost } from '@/types/api'
 
-const API_BASE_URL = 'http://localhost:8081'
+// Nginx 프록시를 통해 /api 경로로 요청
+// 개발 환경에서는 환경 변수로 localhost:8081 사용 가능
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api'
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -52,33 +54,34 @@ export const authApi = {
 }
 
 // Post API
+// baseURL이 '/api'이므로 경로에서 '/api' 제거
 export const postApi = {
   getPostList: async (page: number = 0, size: number = 10, sortType: string = 'RESENT'): Promise<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>> => {
-    const response = await apiClient.get<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>>('/api/post', {
+    const response = await apiClient.get<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>>('/post', {
       params: { page, size, sortType },
     })
     return response.data
   },
   getMyPostList: async (page: number = 0, size: number = 10, sortType: string = 'RESENT'): Promise<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>> => {
-    const response = await apiClient.get<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>>('/api/post/my-post', {
+    const response = await apiClient.get<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>>('/post/my-post', {
       params: { page, size, sortType },
     })
     return response.data
   },
   getPostDetail: async (id: number): Promise<ApiResponse<PostDetailDTO>> => {
-    const response = await apiClient.get<ApiResponse<PostDetailDTO>>(`/api/post/${id}`)
+    const response = await apiClient.get<ApiResponse<PostDetailDTO>>(`/post/${id}`)
     return response.data
   },
   createPost: async (data: CreatePost): Promise<ApiResponse<void>> => {
-    const response = await apiClient.post<ApiResponse<void>>('/api/post', data)
+    const response = await apiClient.post<ApiResponse<void>>('/post', data)
     return response.data
   },
   updatePost: async (id: number, data: PatchPost): Promise<ApiResponse<void>> => {
-    const response = await apiClient.patch<ApiResponse<void>>(`/api/post/${id}`, data)
+    const response = await apiClient.patch<ApiResponse<void>>(`/post/${id}`, data)
     return response.data
   },
   deletePost: async (id: number): Promise<ApiResponse<void>> => {
-    const response = await apiClient.delete<ApiResponse<void>>(`/api/post/${id}`)
+    const response = await apiClient.delete<ApiResponse<void>>(`/post/${id}`)
     return response.data
   },
 }

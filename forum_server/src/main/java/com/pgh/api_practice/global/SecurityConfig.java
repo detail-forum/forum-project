@@ -58,7 +58,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        // 개발 환경과 프로덕션 환경 모두 지원
+        // localhost:3000 (개발), localhost:80 (Nginx), 실제 서버 도메인 허용
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:3000",
+            "http://localhost:80",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:80",
+            "http://*",  // 모든 HTTP 도메인 허용 (프로덕션 환경 대응)
+            "https://*"  // 모든 HTTPS 도메인 허용 (프로덕션 환경 대응)
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
