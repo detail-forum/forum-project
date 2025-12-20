@@ -1,9 +1,9 @@
 import axios from 'axios'
 import type { ApiResponse, LoginRequest, RegisterRequest, LoginResponse, PostListDTO, PostDetailDTO, CreatePost, PatchPost } from '@/types/api'
 
-// Nginx 프록시를 통해 /api 경로로 요청
+// 프로덕션: 외부 서버 URL 사용
 // 개발 환경에서는 환경 변수로 localhost:8081 사용 가능
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://211.110.30.142/api'
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
