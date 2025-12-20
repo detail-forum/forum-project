@@ -16,7 +16,7 @@ pipeline {
     DEPLOY_FRONT_DIR   = 'C:\\deploy\\forum\\frontend'
 
     // Nginx 경로 (실제 경로에 맞게 수정 필요, PATH에 있으면 빈 값으로 두기)
-    NGINX_HOME = ''
+    NGINX_HOME = 'C:\\Nginx\\nginx-1.28.0'
 
     // Next.js telemetry 끄기
     NEXT_TELEMETRY_DISABLED = '1'
