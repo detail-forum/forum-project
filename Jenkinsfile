@@ -1,152 +1,128 @@
 pipeline {
-    agent any
-    
-    environment {
-        // Node.js 버전 (필요시 조정)
-        NODE_VERSION = '20'
-        // Java 버전
-        JAVA_VERSION = '21'
-        // Gradle 버전
-        GRADLE_VERSION = '8.5'
+  agent any
+
+  options {
+    skipDefaultCheckout(true)  // ✅ 중복 checkout 방지
+    timestamps()
+  }
+
+  environment {
+    // 배포 경로
+    DEPLOY_ROOT = 'C:\\deploy\\forum'
+    DEPLOY_BACKEND_DIR = 'C:\\deploy\\forum\\backend'
+    DEPLOY_FRONT_DIR   = 'C:\\deploy\\forum\\frontend'
+
+    // Nginx 경로
+    NGINX_HOME = 'C:\\Nginx\\nginx-1.28.0'
+
+    // (선택) Next telemetry 끄기
+    NEXT_TELEMETRY_DISABLED = '1'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
-    
-    stages {
-        stage('Checkout') {
-            steps {
-                script {
-                    echo '소스 코드 체크아웃 중...'
-                    checkout scm
-                }
-            }
-        }
-        
-        stage('환경 설정') {
-            steps {
-                script {
-                    echo '빌드 환경 확인 중...'
-                    // Node.js 버전 확인
-                    bat '''
-                        node --version
-                        npm --version
-                    '''
-                    // Java 버전 확인
-                    bat '''
-                        java -version
-                    '''
-                    // Gradle 버전 확인
-                    bat '''
-                        cd forum_server
-                        gradlew.bat --version
-                    '''
-                }
-            }
-        }
-        
-        stage('프론트엔드 빌드') {
-            steps {
-                dir('forum_front') {
-                    script {
-                        echo '프론트엔드 의존성 설치 중...'
-                        bat '''
-                            call npm install
-                        '''
-                        
-                        echo '프론트엔드 빌드 중...'
-                        bat '''
-                            call npm run build
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('백엔드 빌드') {
-            steps {
-                dir('forum_server') {
-                    script {
-                        echo '백엔드 빌드 중...'
-                        bat '''
-                            call gradlew.bat clean build -x test
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('테스트 실행') {
-            steps {
-                dir('forum_server') {
-                    script {
-                        echo '백엔드 테스트 실행 중...'
-                        bat '''
-                            call gradlew.bat test
-                        '''
-                    }
-                }
-            }
-            post {
-                always {
-                    // 테스트 결과 리포트 저장
-                    junit 'forum_server/build/test-results/test/*.xml'
-                }
-            }
-        }
-        
-        stage('아티팩트 생성') {
-            steps {
-                script {
-                    echo '빌드 아티팩트 수집 중...'
-                    // 프론트엔드 빌드 결과
-                    archiveArtifacts artifacts: 'forum_front/.next/**', fingerprint: true, allowEmptyArchive: true
-                    // 백엔드 JAR 파일
-                    archiveArtifacts artifacts: 'forum_server/build/libs/*.jar', fingerprint: true, allowEmptyArchive: false
-                }
-            }
-        }
-        
-        stage('배포') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'master'
-                }
-            }
-            steps {
-                script {
-                    echo '배포 준비 중...'
-                    // 여기에 실제 배포 스크립트를 추가하세요
-                    // 예: 서버로 파일 복사, 서비스 재시작 등
-                    bat '''
-                        echo 배포 스크립트를 여기에 추가하세요
-                        REM 예시:
-                        REM xcopy forum_server\\build\\libs\\*.jar C:\\deploy\\ /Y
-                        REM net stop YourServiceName
-                        REM net start YourServiceName
-                    '''
-                }
-            }
-        }
+
+    stage('환경 설정') {
+      steps {
+        bat '''
+          node --version
+          npm --version
+          java -version
+          cd forum_server
+          gradlew.bat --version
+        '''
+      }
     }
-    
-    post {
+
+    stage('프론트엔드 빌드') {
+      steps {
+        dir('forum_front') {
+          bat '''
+            call npm ci
+            call npm run build
+          '''
+        }
+      }
+    }
+
+    stage('백엔드 빌드') {
+      steps {
+        dir('forum_server') {
+          bat '''
+            call gradlew.bat clean build -x test
+          '''
+        }
+      }
+    }
+
+    stage('테스트 실행') {
+      steps {
+        dir('forum_server') {
+          bat '''
+            call gradlew.bat test
+          '''
+        }
+      }
+      post {
         always {
-            script {
-                echo '빌드 완료 - 결과 정리 중...'
-            }
+          junit 'forum_server/build/test-results/test/*.xml'
         }
-        success {
-            script {
-                echo '✅ 빌드 성공!'
-            }
-        }
-        failure {
-            script {
-                echo '❌ 빌드 실패!'
-            }
-        }
-        cleanup {
-            // 빌드 후 정리 작업
-            cleanWs()
-        }
+      }
     }
+
+    stage('아티팩트 복사') {
+      steps {
+        bat """
+          if not exist "${DEPLOY_BACKEND_DIR}" mkdir "${DEPLOY_BACKEND_DIR}"
+          if not exist "${DEPLOY_FRONT_DIR}" mkdir "${DEPLOY_FRONT_DIR}"
+
+          REM ✅ 백엔드 jar 복사 (최신 jar 1개를 app.jar로 통일)
+          for %%F in (forum_server\\build\\libs\\*.jar) do copy /Y "%%F" "${DEPLOY_BACKEND_DIR}\\app.jar"
+
+          REM ✅ 프론트 빌드 결과 복사 (Next는 서버 실행이 필요해서 .next도 복사)
+          REM 필요하면 node_modules는 제외하고, package.json/next.config.js 등도 같이 복사 권장
+          xcopy /E /I /Y "forum_front\\.next" "${DEPLOY_FRONT_DIR}\\.next"
+          xcopy /E /I /Y "forum_front\\public" "${DEPLOY_FRONT_DIR}\\public"
+          copy /Y "forum_front\\package.json" "${DEPLOY_FRONT_DIR}\\package.json"
+        """
+      }
+    }
+
+    stage('배포') {
+      when {
+        expression {
+          // ✅ Multibranch(BRANCH_NAME) / 일반 Pipeline(GIT_BRANCH) 둘 다 대응
+          def b = (env.BRANCH_NAME ?: env.GIT_BRANCH ?: '')
+          return b.contains('main') || b.contains('master')
+        }
+      }
+      steps {
+        bat """
+          echo ===== 서비스 재시작(예시) =====
+
+          REM ✅ 백엔드 서비스 재시작 (서비스명은 실제 등록한 이름으로 변경)
+          REM net stop forum-backend
+          REM net start forum-backend
+
+          REM ✅ 프론트 서비스 재시작 (서비스명은 실제 등록한 이름으로 변경)
+          REM net stop forum-frontend
+          REM net start forum-frontend
+
+          echo ===== Nginx 설정 테스트 & 리로드 =====
+          "${NGINX_HOME}\\nginx.exe" -t
+          "${NGINX_HOME}\\nginx.exe" -s reload
+        """
+      }
+    }
+  }
+
+  post {
+    success { echo '✅ 빌드 성공!' }
+    failure { echo '❌ 빌드 실패!' }
+    cleanup { cleanWs() }
+  }
 }
