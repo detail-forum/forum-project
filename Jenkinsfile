@@ -93,31 +93,19 @@ pipeline {
     }
 
     stage('배포') {
-      when {
-        expression {
-          // ✅ Multibranch(BRANCH_NAME) / 일반 Pipeline(GIT_BRANCH) 둘 다 대응
-          def b = (env.BRANCH_NAME ?: env.GIT_BRANCH ?: '')
-          return b.contains('main') || b.contains('master')
-        }
-      }
-      steps {
-        bat """
-          echo ===== 서비스 재시작(예시) =====
+  steps {
+    bat """
+      net stop forum-backend
+      net start forum-backend
+      net stop forum-frontend
+      net start forum-frontend
 
-          REM ✅ 백엔드 서비스 재시작 (서비스명은 실제 등록한 이름으로 변경)
-          REM net stop forum-backend
-          REM net start forum-backend
+      "${NGINX_HOME}\\nginx.exe" -t
+      "${NGINX_HOME}\\nginx.exe" -s reload
+    """
+  }
+}
 
-          REM ✅ 프론트 서비스 재시작 (서비스명은 실제 등록한 이름으로 변경)
-          REM net stop forum-frontend
-          REM net start forum-frontend
-
-          echo ===== Nginx 설정 테스트 & 리로드 =====
-          "${NGINX_HOME}\\nginx.exe" -t
-          "${NGINX_HOME}\\nginx.exe" -s reload
-        """
-      }
-    }
   }
 
   post {
