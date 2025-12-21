@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @AllArgsConstructor
@@ -46,6 +47,7 @@ public class PostService {
     }
 
     /** ✅ 단건 조회 (조회수 증가 포함) */
+    @Transactional
     public PostDetailDTO getPostDetail(long id) {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("게시글을 찾을 수 없습니다."));
@@ -68,6 +70,7 @@ public class PostService {
     }
 
     /** ✅ 전체 게시글 목록 */
+    @Transactional(readOnly = true)
     public Page<PostListDTO> getPostList(Pageable pageable, String sortType) {
         Page<Post> posts;
 
@@ -90,6 +93,7 @@ public class PostService {
     }
 
     /** ✅ 내 게시글 목록 */
+    @Transactional(readOnly = true)
     public Page<PostListDTO> getMyPostList(Pageable pageable, String sortType) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null || "anonymousUser".equals(authentication.getName())) {
