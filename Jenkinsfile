@@ -36,27 +36,20 @@ pipeline {
                 steps {
                     dir('forum_front') {
                         bat '''
-                            @echo on
-                            echo ===== Frontend Build =====
+                        bat '@echo on'
+                                    bat 'echo ===== Frontend Build ====='
 
-                            REM Node 경로 고정
-                            set NODE_HOME=C:\\Program Files\\nodejs
-                            set PATH=%NODE_HOME%;%PATH%
+                                    bat 'set NODE_HOME=C:\\Program Files\\nodejs'
+                                    bat 'set PATH=%NODE_HOME%;%PATH%'
 
-                            echo [1] Node & NPM version
-                            "%NODE_HOME%\\node.exe" -v || exit /b 1
-                            "%NODE_HOME%\\npm.cmd" -v || exit /b 1
+                                    bat '"C:\\Program Files\\nodejs\\node.exe" -v'
+                                    bat '"C:\\Program Files\\nodejs\\npm.cmd" -v'
 
-                            echo [2] Install dependencies
-                            call "%NODE_HOME%\\npm.cmd" ci || exit /b 1
+                                    bat 'call "C:\\Program Files\\nodejs\\npm.cmd" ci'
+                                    bat 'call "C:\\Program Files\\nodejs\\npm.cmd" run build'
 
-                            echo [3] Build Next.js
-                            call "%NODE_HOME%\\npm.cmd" run build || exit /b 1
-
-                            echo [4] Verify build output
-                            dir
-                            dir .next || exit /b 1
-
+                                    bat 'dir'
+                                    bat 'dir .next'
                             echo Frontend build completed successfully
                         '''
                     }
