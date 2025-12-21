@@ -16,6 +16,9 @@ pipeline {
 
         // Next.js 텔레메트리 비활성화
         NEXT_TELEMETRY_DISABLED = '1'
+        
+        // 프론트엔드 API URL (HTTPS)
+        NEXT_PUBLIC_API_URL = 'https://forum.rjsgud.com/api'
     }
 
     stages {
@@ -54,6 +57,7 @@ pipeline {
                         Write-Host ""
                         
                         Write-Host "Building Next.js application..." -ForegroundColor Yellow
+                        Write-Host "API URL: $env:NEXT_PUBLIC_API_URL" -ForegroundColor Cyan
                         npm run build
                         if ($LASTEXITCODE -ne 0) {
                             Write-Host "[ERROR] npm run build failed!" -ForegroundColor Red

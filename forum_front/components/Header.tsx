@@ -7,6 +7,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import type { RootState } from '@/store/store'
 import { logout } from '@/store/slices/authSlice'
 import { useRouter } from 'next/navigation'
+import { getUsernameFromToken } from '@/utils/jwt'
 
 interface HeaderProps {
   onLoginClick: () => void
@@ -14,6 +15,7 @@ interface HeaderProps {
 
 export default function Header({ onLoginClick }: HeaderProps) {
   const [mounted, setMounted] = useState(false)
+  const [username, setUsername] = useState<string | null>(null)
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
   const dispatch = useDispatch()
   const router = useRouter()
@@ -22,6 +24,16 @@ export default function Header({ onLoginClick }: HeaderProps) {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // 인증 상태가 변경될 때마다 username 업데이트
+  useEffect(() => {
+    if (mounted && isAuthenticated) {
+      const user = getUsernameFromToken()
+      setUsername(user)
+    } else {
+      setUsername(null)
+    }
+  }, [mounted, isAuthenticated])
 
   const handleLogout = () => {
     // Redux 상태에서 로그아웃 처리 (토큰 제거 포함)
@@ -51,6 +63,11 @@ export default function Header({ onLoginClick }: HeaderProps) {
           <nav className="flex items-center space-x-4">
             {mounted && isAuthenticated ? (
               <>
+                {username && (
+                  <span className="text-sm text-gray-600 font-medium">
+                    {username}님
+                  </span>
+                )}
                 <Link
                   href="/posts"
                   className="text-gray-700 hover:text-primary transition-colors"
