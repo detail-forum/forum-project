@@ -30,7 +30,7 @@ function PostCard({ post }: PostCardProps) {
       <div className="flex items-center justify-between text-sm text-gray-500">
         <div className="flex items-center space-x-4">
           <span>{post.username}</span>
-          <span>조회수: {post.views || post.Views || 0}</span>
+          <span>조회수: {(post.views ?? post.Views) ?? 0}</span>
         </div>
         <span>{formatDate(post.createDateTime)}</span>
       </div>

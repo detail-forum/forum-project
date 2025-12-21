@@ -25,6 +25,8 @@ export interface PostListDTO {
   id: number
   title: string
   username: string
+  views?: number  // 조회수 (선택적)
+  Views?: number  // 백엔드에서 대문자로 올 수 있음 (대체)
   createDateTime: string
   updateDateTime: string
 }
