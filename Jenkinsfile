@@ -32,28 +32,31 @@ pipeline {
         /* =========================
            2. Frontend Build (Next.js)
         ========================= */
-        stage('Frontend Build') {
+                stage('Frontend Build') {
             steps {
                 dir('forum_front') {
                     bat '''
                         @echo on
                         echo ===== Frontend Build =====
 
-                        echo [1] Node & NPM
-                        node -v
-                        npm -v
+                        set NODE_HOME=C:\\Program Files\\nodejs
+                        set PATH=%NODE_HOME%;%PATH%
 
-                        echo [2] Clean install
-                        call npm ci || exit /b 1
+                        echo [1] Node & NPM version
+                        "%NODE_HOME%\\node.exe" -v || exit /b 1
+                        "%NODE_HOME%\\npm.cmd" -v || exit /b 1
 
-                        echo [3] Next build
-                        call npm run build || exit /b 1
+                        echo [2] npm ci
+                        call "%NODE_HOME%\\npm.cmd" ci || exit /b 1
 
-                        echo [4] Check build result
+                        echo [3] npm run build
+                        call "%NODE_HOME%\\npm.cmd" run build || exit /b 1
+
+                        echo [4] Verify build result
                         dir
                         dir .next || exit /b 1
 
-                        echo Frontend build completed
+                        echo Frontend build completed successfully
                     '''
                 }
             }
