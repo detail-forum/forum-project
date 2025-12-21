@@ -36,35 +36,29 @@ pipeline {
             steps {
                 dir('forum_front') {
                     bat '''
-                        @echo off
+                        @echo on
                         echo ===== Frontend Build =====
+
+                        echo [1] Node & NPM
                         node -v
                         npm -v
-                        echo.
-                        echo Installing dependencies...
-                        npm ci
-                        if errorlevel 1 (
-                            echo [ERROR] npm ci failed!
-                            exit /b 1
-                        )
-                        echo.
-                        echo Building Next.js application...
-                        npm run build
-                        if errorlevel 1 (
-                            echo [ERROR] npm run build failed!
-                            exit /b 1
-                        )
-                        echo.
-                        echo Verifying build output...
-                        if not exist ".next" (
-                            echo [ERROR] .next directory not found after build!
-                            exit /b 1
-                        )
-                        echo Frontend build completed successfully
+
+                        echo [2] Clean install
+                        call npm ci || exit /b 1
+
+                        echo [3] Next build
+                        call npm run build || exit /b 1
+
+                        echo [4] Check build result
+                        dir
+                        dir .next || exit /b 1
+
+                        echo Frontend build completed
                     '''
                 }
             }
         }
+
 
         /* =========================
            3. Backend Build (Spring)
