@@ -70,19 +70,54 @@ export default function PostDetailPage() {
       }
       
       // 이미지 요소
-      const alt = match[1]
-      const url = match[2]
+      const alt = match[1] || '이미지'
+      const originalUrl = match[2]
+      if (!originalUrl || !originalUrl.trim()) {
+        // URL이 없으면 건너뛰기
+        lastIndex = match.index + match[0].length
+        continue
+      }
+      
+      let url = originalUrl.trim()
+      
+      // URL 정규화
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        // 상대 경로인 경우 /로 시작하도록 보장
+        if (!url.startsWith('/')) {
+          url = '/' + url
+        }
+      }
+      
+      console.log('이미지 렌더링:', { alt, url, originalUrl })
+      
       parts.push(
-        <img
-          key={`img-${keyCounter++}`}
-          src={url}
-          alt={alt}
-          className="max-w-full h-auto rounded-lg my-4"
-          onError={(e) => {
-            // 이미지 로드 실패 시 숨김
-            e.currentTarget.style.display = 'none'
-          }}
-        />
+        <div key={`img-container-${keyCounter++}`} className="my-4">
+          <img
+            src={url}
+            alt={alt}
+            className="max-w-full h-auto rounded-lg border border-gray-200 shadow-sm"
+            onError={(e) => {
+              console.error('이미지 로드 실패:', {
+                url,
+                originalUrl,
+                src: e.currentTarget.src,
+                currentSrc: e.currentTarget.currentSrc,
+              })
+              const img = e.currentTarget
+              const container = img.parentElement
+              if (container && !container.querySelector('.error-message')) {
+                img.style.display = 'none'
+                const errorDiv = document.createElement('div')
+                errorDiv.className = 'error-message text-red-500 text-sm p-2 bg-red-50 rounded'
+                errorDiv.textContent = `이미지를 불러올 수 없습니다: ${url}`
+                container.appendChild(errorDiv)
+              }
+            }}
+            onLoad={() => {
+              console.log('이미지 로드 성공:', url)
+            }}
+          />
+        </div>
       )
       
       lastIndex = match.index + match[0].length
@@ -205,7 +240,7 @@ export default function PostDetailPage() {
                 </div>
               </div>
             <div className="prose max-w-none">
-              <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+              <div className="text-gray-800 leading-relaxed">
                 {renderMarkdown(post.body)}
               </div>
             </div>

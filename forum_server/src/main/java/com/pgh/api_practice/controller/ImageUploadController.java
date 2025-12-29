@@ -85,6 +85,14 @@ public class ImageUploadController {
             try (var inputStream = file.getInputStream()) {
                 Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
             }
+            
+            // 파일 저장 확인
+            if (!Files.exists(targetPath)) {
+                log.error("파일 저장 실패: {}", targetPath);
+                return ResponseEntity.status(500).body(ApiResponse.fail("파일 저장에 실패했습니다."));
+            }
+            
+            log.info("파일 저장 성공: {} (크기: {} bytes)", targetPath, Files.size(targetPath));
 
             // URL 생성 (Nginx가 /uploads/로 서빙)
             String imageUrl = "/uploads/" + savedFilename;

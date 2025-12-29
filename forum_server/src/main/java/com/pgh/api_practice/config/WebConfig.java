@@ -1,15 +1,22 @@
 package com.pgh.api_practice.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.nio.file.Paths;
 
 @Configuration
 public class WebConfig {
 
+    @Value("${app.upload.dir:C:/app-data/uploads}")
+    private String uploadDir;
+
     @Bean
-    public WebMvcConfigurer corsConfigurer() {
+    public WebMvcConfigurer webMvcConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
@@ -31,6 +38,15 @@ public class WebConfig {
                         .allowedHeaders("*")
                         .allowCredentials(true)
                         .maxAge(3600);
+            }
+
+            @Override
+            public void addResourceHandlers(ResourceHandlerRegistry registry) {
+                // /uploads/ 경로로 요청이 오면 업로드 디렉토리의 파일을 제공
+                String uploadPath = Paths.get(uploadDir).toUri().toString();
+                registry.addResourceHandler("/uploads/**")
+                        .addResourceLocations("file:" + uploadPath)
+                        .setCachePeriod(86400); // 24시간 캐싱
             }
         };
     }
