@@ -46,8 +46,9 @@ export default function PostDetailPage() {
     try {
       if (!dateString) return ''
       const date = new Date(dateString)
-      // 유효하지 않은 날짜 체크 (1970년 이전이거나 미래 날짜는 무시)
-      if (isNaN(date.getTime()) || date.getTime() < 0 || date.getTime() > Date.now() + 86400000) {
+      // 유효하지 않은 날짜 체크 (1970년 1월 1일 이전이거나 미래 날짜는 무시)
+      const minValidDate = new Date('1970-01-02T00:00:00Z').getTime()
+      if (isNaN(date.getTime()) || date.getTime() < minValidDate || date.getTime() > Date.now() + 86400000) {
         return ''
       }
       return format(date, 'yyyy년 MM월 dd일 HH:mm', { locale: ko })
@@ -60,15 +61,24 @@ export default function PostDetailPage() {
   const hasValidUpdateDate = () => {
     if (!post) return false
     if (!post.updateDateTime) return false
-    if (post.updateDateTime === post.createDateTime) return false
     
     try {
       const updateDate = new Date(post.updateDateTime)
       const createDate = new Date(post.createDateTime)
-      // 유효한 날짜이고 작성일과 다른 경우만 true
-      return !isNaN(updateDate.getTime()) && 
-             updateDate.getTime() > 0 && 
-             updateDate.getTime() !== createDate.getTime()
+      
+      // 유효하지 않은 날짜 체크 (1970년 1월 1일 이전)
+      const minValidDate = new Date('1970-01-02T00:00:00Z').getTime()
+      if (isNaN(updateDate.getTime()) || updateDate.getTime() < minValidDate) {
+        return false
+      }
+      
+      // 작성일과 같은 경우 false
+      if (updateDate.getTime() === createDate.getTime()) {
+        return false
+      }
+      
+      // 작성일보다 이후인 경우만 true (수정일이 작성일보다 이전이면 잘못된 데이터)
+      return updateDate.getTime() > createDate.getTime()
     } catch {
       return false
     }

@@ -17,6 +17,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 @AllArgsConstructor
 public class PostService {
@@ -150,6 +152,7 @@ public class PostService {
     }
 
     /** ✅ 게시글 수정 */
+    @Transactional
     public void updatePost(long id, PatchPostDTO dto) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null || "anonymousUser".equals(authentication.getName())) {
@@ -169,9 +172,22 @@ public class PostService {
             throw new ApplicationUnauthorizedException("작성자만 게시글을 수정할 수 있습니다.");
         }
 
-        if (dto.getBody() != null) post.setBody(dto.getBody());
-        if (dto.getTitle() != null) post.setTitle(dto.getTitle());
+        // 내용이 실제로 변경되었는지 확인
+        boolean isModified = false;
+        if (dto.getBody() != null && !dto.getBody().equals(post.getBody())) {
+            post.setBody(dto.getBody());
+            isModified = true;
+        }
+        if (dto.getTitle() != null && !dto.getTitle().equals(post.getTitle())) {
+            post.setTitle(dto.getTitle());
+            isModified = true;
+        }
 
-        postRepository.save(post);
+        // 변경사항이 있을 때만 저장
+        if (isModified) {
+            // 명시적으로 수정 시간 설정 (LastModifiedDate가 제대로 작동하지 않을 경우 대비)
+            post.setUpdatedTime(LocalDateTime.now());
+            postRepository.save(post);
+        }
     }
 }
