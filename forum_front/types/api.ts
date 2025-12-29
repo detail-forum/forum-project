@@ -51,3 +51,28 @@ export interface PatchPost {
   body?: string
 }
 
+export interface CommentDTO {
+  id: number
+  body: string
+  username: string
+  userId: number
+  postId: number
+  parentCommentId: number | null
+  isPinned: boolean
+  likeCount: number
+  isLiked: boolean
+  createDateTime: string
+  updateDateTime: string
+  replies: CommentDTO[]
+}
+
+export interface CreateCommentDTO {
+  body: string
+  postId: number
+  parentCommentId?: number | null
+}
+
+export interface UpdateCommentDTO {
+  body: string
+}
+

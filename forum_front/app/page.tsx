@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, lazy, Suspense } from 'react'
-import { useSelector } from 'react-redux'
-import type { RootState } from '@/store/store'
 import Header from '@/components/Header'
 import Hero from '@/components/Hero'
 import { PostListSkeleton } from '@/components/SkeletonLoader'
@@ -13,7 +11,6 @@ const LoginModal = lazy(() => import('@/components/LoginModal'))
 
 export default function Home() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
 
   return (
     <div className="min-h-screen bg-white">

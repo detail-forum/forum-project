@@ -7,6 +7,7 @@ import type { RootState } from '@/store/store'
 import { postApi } from '@/services/api'
 import type { PostDetailDTO } from '@/types/api'
 import Header from '@/components/Header'
+import CommentList from '@/components/CommentList'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { getUsernameFromToken } from '@/utils/jwt'
@@ -77,51 +78,56 @@ export default function PostDetailPage() {
         {loading ? (
           <div className="text-center text-gray-500">로딩 중...</div>
         ) : post ? (
-          <article className="bg-white">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
-            <div className="flex items-center justify-between text-sm text-gray-500 mb-8 pb-4 border-b">
-              <div className="flex items-center space-x-4">
-                <span>{post.username}</span>
-                <span>조회수: {post.views || post.Views || '0'}</span>
+          <>
+            <article className="bg-white">
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
+              <div className="flex items-center justify-between text-sm text-gray-500 mb-8 pb-4 border-b">
+                <div className="flex items-center space-x-4">
+                  <span>{post.username}</span>
+                  <span>조회수: {post.views || post.Views || '0'}</span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span>작성일: {formatDate(post.createDateTime)}</span>
+                  {post.updateDateTime !== post.createDateTime && (
+                    <span className="text-xs">수정일: {formatDate(post.updateDateTime)}</span>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col items-end">
-                <span>작성일: {formatDate(post.createDateTime)}</span>
-                {post.updateDateTime !== post.createDateTime && (
-                  <span className="text-xs">수정일: {formatDate(post.updateDateTime)}</span>
+              <div className="prose max-w-none">
+                <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+                  {post.body}
+                </div>
+              </div>
+              <div className="mt-8 pt-8 border-t flex justify-between items-center">
+                <button
+                  onClick={() => router.back()}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  목록으로
+                </button>
+                {isOwner && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => router.push(`/posts/${params.id}/edit`)}
+                      className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deleting ? '삭제 중...' : '삭제'}
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
-            <div className="prose max-w-none">
-              <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                {post.body}
-              </div>
-            </div>
-            <div className="mt-8 pt-8 border-t flex justify-between items-center">
-              <button
-                onClick={() => router.back()}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                목록으로
-              </button>
-              {isOwner && (
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => router.push(`/posts/${params.id}/edit`)}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {deleting ? '삭제 중...' : '삭제'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </article>
+            </article>
+
+            {/* 댓글 섹션 */}
+            <CommentList postId={Number(params.id)} postAuthorUsername={post.username} />
+          </>
         ) : (
           <div className="text-center text-gray-500">게시글을 찾을 수 없습니다.</div>
         )}

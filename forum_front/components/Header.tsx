@@ -69,8 +69,6 @@ export default function Header({ onLoginClick }: HeaderProps) {
             >
               게시글 목록
             </Link>
-            {mounted && isAuthenticated ? (
-              <>
                 <Link
                   href="/posts"
                   className="text-gray-700 hover:text-primary transition-colors"
@@ -85,11 +83,12 @@ export default function Header({ onLoginClick }: HeaderProps) {
                 >
                   내 게시글
                 </Link>
+            {mounted && isAuthenticated ? (
+              <>
                 
                 <span className="text-gray-700 font-medium">
                   {username || '사용자'}님 환영합니다.
                 </span>
-                
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 text-gray-700 hover:text-primary transition-colors"
