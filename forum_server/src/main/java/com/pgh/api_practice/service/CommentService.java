@@ -31,7 +31,7 @@ public class CommentService {
     private final UserRepository userRepository;
 
     /**
-     * 현재 인증된 사용자 정보 가져오기
+     * 현재 인증된 사용자 정보 가져오기 (인증 필수)
      */
     private Users getCurrentUser() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -44,16 +44,23 @@ public class CommentService {
     }
 
     /**
+     * 현재 인증된 사용자 정보 가져오기 (인증 선택적, 없으면 null 반환)
+     */
+    private Users getCurrentUserOrNull() {
+        try {
+            return getCurrentUser();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * 댓글 목록 조회 (대댓글 포함)
      */
     @Transactional(readOnly = true)
     public List<CommentDTO> getCommentsByPostId(Long postId) {
-        Users currentUser = null;
-        try {
-            currentUser = getCurrentUser();
-        } catch (Exception e) {
-            // 인증되지 않은 사용자도 댓글을 볼 수 있음
-        }
+        // 인증되지 않은 사용자도 댓글을 볼 수 있음
+        Users currentUser = getCurrentUserOrNull();
 
         // 최상위 댓글 목록 조회
         List<Comment> topLevelComments = commentRepository.findAllByPostIdAndNotDeletedAndNoParent(postId);

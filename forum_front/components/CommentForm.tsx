@@ -45,8 +45,21 @@ export default function CommentForm({
         }
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || '댓글 작성에 실패했습니다.')
+      const errorMessage = err.response?.data?.message || 
+        (err.response?.status === 403 ? '로그인이 필요합니다. 다시 로그인해주세요.' : 
+         err.response?.status === 502 ? '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.' :
+         '댓글 작성에 실패했습니다.')
+      alert(errorMessage)
       console.error('댓글 작성 실패:', err)
+      
+      // 403 오류 시 로그인 페이지로 리다이렉트
+      if (err.response?.status === 403 && typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 1000)
+      }
     } finally {
       setIsSubmitting(false)
     }
