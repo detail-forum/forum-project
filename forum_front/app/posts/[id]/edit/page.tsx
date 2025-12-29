@@ -78,7 +78,9 @@ export default function EditPostPage() {
 
       const response = await postApi.updatePost(Number(params.id), updateData)
       if (response.success) {
+        // 수정 후 페이지 이동 시 캐시 무효화를 위해 router.refresh() 호출
         router.push(`/posts/${params.id}`)
+        router.refresh()
       }
     } catch (err: any) {
       setError(err.response?.data?.message || '게시글 수정에 실패했습니다.')

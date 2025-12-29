@@ -33,6 +33,9 @@ export default function PostDetailPage() {
       if (response.success && response.data) {
         // 디버깅: 실제 응답 구조 확인
         console.log('게시글 응답 데이터:', response.data)
+        console.log('작성일:', response.data.createDateTime)
+        console.log('수정일:', response.data.updateDateTime)
+        console.log('수정일 타입:', typeof response.data.updateDateTime)
         setPost(response.data)
       }
     } catch (error) {
@@ -59,27 +62,43 @@ export default function PostDetailPage() {
 
   // 수정일이 유효하고 작성일과 다른지 확인
   const hasValidUpdateDate = () => {
-    if (!post) return false
-    if (!post.updateDateTime) return false
+    if (!post) {
+      console.log('[hasValidUpdateDate] post가 없음')
+      return false
+    }
+    if (!post.updateDateTime) {
+      console.log('[hasValidUpdateDate] updateDateTime이 없음')
+      return false
+    }
     
     try {
       const updateDate = new Date(post.updateDateTime)
       const createDate = new Date(post.createDateTime)
       
+      console.log('[hasValidUpdateDate] updateDate:', updateDate)
+      console.log('[hasValidUpdateDate] createDate:', createDate)
+      console.log('[hasValidUpdateDate] updateDate.getTime():', updateDate.getTime())
+      console.log('[hasValidUpdateDate] createDate.getTime():', createDate.getTime())
+      
       // 유효하지 않은 날짜 체크 (1970년 1월 1일 이전)
       const minValidDate = new Date('1970-01-02T00:00:00Z').getTime()
       if (isNaN(updateDate.getTime()) || updateDate.getTime() < minValidDate) {
+        console.log('[hasValidUpdateDate] 유효하지 않은 날짜')
         return false
       }
       
       // 작성일과 같은 경우 false
       if (updateDate.getTime() === createDate.getTime()) {
+        console.log('[hasValidUpdateDate] 작성일과 수정일이 같음')
         return false
       }
       
       // 작성일보다 이후인 경우만 true (수정일이 작성일보다 이전이면 잘못된 데이터)
-      return updateDate.getTime() > createDate.getTime()
-    } catch {
+      const isValid = updateDate.getTime() > createDate.getTime()
+      console.log('[hasValidUpdateDate] 최종 결과:', isValid)
+      return isValid
+    } catch (error) {
+      console.error('[hasValidUpdateDate] 에러:', error)
       return false
     }
   }

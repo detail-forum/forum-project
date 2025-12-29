@@ -65,13 +65,20 @@ public class PostService {
         post = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("게시글을 찾을 수 없습니다."));
 
+        // updateDateTime이 null이거나 유효하지 않은 경우 createDateTime으로 설정
+        LocalDateTime updateTime = post.getUpdatedTime();
+        if (updateTime == null || updateTime.isBefore(post.getCreatedTime()) || 
+            updateTime.isBefore(LocalDateTime.of(1970, 1, 2, 0, 0))) {
+            updateTime = post.getCreatedTime();
+        }
+
         return PostDetailDTO.builder()
                 .title(post.getTitle())
                 .body(post.getBody())
                 .username(post.getUser().getUsername())
                 .Views(String.valueOf(post.getViews()))
                 .createDateTime(post.getCreatedTime())
-                .updateDateTime(post.getUpdatedTime())
+                .updateDateTime(updateTime)
                 .build();
     }
 
@@ -88,14 +95,23 @@ public class PostService {
             posts = postRepository.findAllByIsDeletedFalseOrderByCreatedTimeDesc(pageable);
         }
 
-        return posts.map(post -> PostListDTO.builder()
-                .id(post.getId())
-                .title(post.getTitle())
-                .username(post.getUser().getUsername())
-                .views(post.getViews())
-                .createDateTime(post.getCreatedTime())
-                .updateDateTime(post.getUpdatedTime())
-                .build());
+        return posts.map(post -> {
+            // updateDateTime이 null이거나 유효하지 않은 경우 createDateTime으로 설정
+            LocalDateTime updateTime = post.getUpdatedTime();
+            if (updateTime == null || updateTime.isBefore(post.getCreatedTime()) || 
+                updateTime.isBefore(LocalDateTime.of(1970, 1, 2, 0, 0))) {
+                updateTime = post.getCreatedTime();
+            }
+            
+            return PostListDTO.builder()
+                    .id(post.getId())
+                    .title(post.getTitle())
+                    .username(post.getUser().getUsername())
+                    .views(post.getViews())
+                    .createDateTime(post.getCreatedTime())
+                    .updateDateTime(updateTime)
+                    .build();
+        });
     }
 
     /** ✅ 내 게시글 목록 */
@@ -121,14 +137,23 @@ public class PostService {
             posts = postRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedTimeDesc(user.getId(), pageable);
         }
 
-        return posts.map(post -> PostListDTO.builder()
-                .id(post.getId())
-                .title(post.getTitle())
-                .username(post.getUser().getUsername())
-                .views(post.getViews())
-                .createDateTime(post.getCreatedTime())
-                .updateDateTime(post.getUpdatedTime())
-                .build());
+        return posts.map(post -> {
+            // updateDateTime이 null이거나 유효하지 않은 경우 createDateTime으로 설정
+            LocalDateTime updateTime = post.getUpdatedTime();
+            if (updateTime == null || updateTime.isBefore(post.getCreatedTime()) || 
+                updateTime.isBefore(LocalDateTime.of(1970, 1, 2, 0, 0))) {
+                updateTime = post.getCreatedTime();
+            }
+            
+            return PostListDTO.builder()
+                    .id(post.getId())
+                    .title(post.getTitle())
+                    .username(post.getUser().getUsername())
+                    .views(post.getViews())
+                    .createDateTime(post.getCreatedTime())
+                    .updateDateTime(updateTime)
+                    .build();
+        });
     }
 
     /** ✅ 게시글 삭제 */
@@ -188,6 +213,8 @@ public class PostService {
             // 명시적으로 수정 시간 설정 (LastModifiedDate가 제대로 작동하지 않을 경우 대비)
             post.setUpdatedTime(LocalDateTime.now());
             postRepository.save(post);
+            // 저장 후 플러시하여 DB에 반영
+            postRepository.flush();
         }
     }
 }
