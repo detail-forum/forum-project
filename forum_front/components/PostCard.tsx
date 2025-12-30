@@ -83,8 +83,14 @@ function PostCard({ post }: PostCardProps) {
           <span className="font-medium text-gray-800">{post.username}</span>
           <span className="text-gray-500">{formatDate(post.createDateTime)}</span>
         </div>
-        <div className="text-xs text-gray-500">
-          조회수: {(post.views ?? post.Views) ?? 0}
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>조회수: {(post.views ?? post.Views) ?? 0}</span>
+          <span className="flex items-center space-x-1">
+            <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            <span>{post.likeCount ?? 0}</span>
+          </span>
         </div>
       </div>
     </Link>

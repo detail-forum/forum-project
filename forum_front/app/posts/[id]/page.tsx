@@ -21,6 +21,7 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [liking, setLiking] = useState(false)
 
   useEffect(() => {
     if (params.id) {
@@ -419,6 +420,32 @@ export default function PostDetailPage() {
     const currentUsername = getUsernameFromToken()
     const isOwner = isAuthenticated && post && currentUsername === post.username
 
+    const handleLike = async () => {
+      if (!isAuthenticated) {
+        setShowLoginModal(true)
+        return
+      }
+
+      try {
+        setLiking(true)
+        const response = await postApi.toggleLike(Number(params.id))
+        if (response.success && post) {
+          // 좋아요 상태 업데이트
+          const newIsLiked = response.data || false
+          const newLikeCount = newIsLiked ? post.likeCount + 1 : post.likeCount - 1
+          setPost({
+            ...post,
+            isLiked: newIsLiked,
+            likeCount: newLikeCount,
+          })
+        }
+      } catch (error: any) {
+        alert(error.response?.data?.message || '좋아요 처리에 실패했습니다.')
+      } finally {
+        setLiking(false)
+      }
+    }
+
     const handleEdit = () => {
       if (!isAuthenticated) {
         setShowLoginModal(true)
@@ -470,6 +497,12 @@ export default function PostDetailPage() {
                   <div className="flex items-center space-x-4">
                     <span>{post.username}</span>
                     <span>조회수: {post.views || post.Views || '0'}</span>
+                    <span className="flex items-center space-x-1">
+                      <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      <span>좋아요: {post.likeCount || 0}</span>
+                    </span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span>작성일: {formatDate(post.createDateTime)}</span>
@@ -490,23 +523,50 @@ export default function PostDetailPage() {
                   >
                     목록으로
                   </button>
-                  {isOwner && (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={handleEdit}
-                        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors"
+                  <div className="flex items-center space-x-4">
+                    {/* 좋아요 버튼 */}
+                    <button
+                      onClick={handleLike}
+                      disabled={liking || !isAuthenticated}
+                      className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                        post.isLiked
+                          ? 'bg-red-500 text-white hover:bg-red-600'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill={post.isLiked ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        수정
-                      </button>
-                      <button
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {deleting ? '삭제 중...' : '삭제'}
-                      </button>
-                    </div>
-                  )}
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                      <span>{post.likeCount || 0}</span>
+                    </button>
+                    {isOwner && (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={handleEdit}
+                          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={handleDelete}
+                          disabled={deleting}
+                          className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deleting ? '삭제 중...' : '삭제'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </article>
 

@@ -18,4 +18,5 @@ public class PostListDTO {
     private LocalDateTime createDateTime;
     private LocalDateTime updateDateTime;
     private String profileImageUrl;
+    private long likeCount;
 }

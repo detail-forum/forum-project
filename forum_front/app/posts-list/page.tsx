@@ -8,7 +8,7 @@ import Header from '@/components/Header'
 import PostCard from '@/components/PostCard'
 import { PostListSkeleton } from '@/components/SkeletonLoader'
 
-type SortType = 'RESENT' | 'HITS'
+type SortType = 'RESENT' | 'HITS' | 'LIKES'
 
 function PostsListContent() {
   const router = useRouter()
@@ -28,7 +28,7 @@ function PostsListContent() {
     if (pageParam) {
       setPage(parseInt(pageParam) - 1) // URL은 1부터 시작, 내부는 0부터
     }
-    if (sortParam && (sortParam === 'RESENT' || sortParam === 'HITS')) {
+    if (sortParam && (sortParam === 'RESENT' || sortParam === 'HITS' || sortParam === 'LIKES')) {
       setSortType(sortParam)
     }
   }, [searchParams])
@@ -96,6 +96,16 @@ function PostsListContent() {
               }`}
             >
               조회수순
+            </button>
+            <button
+              onClick={() => handleSortChange('LIKES')}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                sortType === 'LIKES'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              좋아요순
             </button>
           </div>
         </div>

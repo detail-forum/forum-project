@@ -72,4 +72,12 @@ public class PostController {
         postService.updatePost(id, dto);
         return ResponseEntity.ok(ApiResponse.ok("수정 성공"));
     }
+
+    /** ✅ 게시글 좋아요 토글 */
+    // POST http://localhost:8081/post/{id}/like
+    @PostMapping("/{id}/like")
+    public ResponseEntity<ApiResponse<Boolean>> toggleLike(@PathVariable long id) {
+        boolean isLiked = postService.toggleLike(id);
+        return ResponseEntity.ok(ApiResponse.ok(isLiked, isLiked ? "좋아요 추가" : "좋아요 취소"));
+    }
 }

@@ -34,6 +34,7 @@ export interface PostListDTO {
   createDateTime: string
   updateDateTime: string
   profileImageUrl?: string  // 게시물 프로필 이미지 URL
+  likeCount: number
 }
 
 export interface PostDetailDTO {
@@ -44,6 +45,9 @@ export interface PostDetailDTO {
   Views?: string  // 백엔드에서 대문자로 올 수 있음 (대체)
   createDateTime: string
   updateDateTime: string
+  profileImageUrl?: string
+  likeCount: number
+  isLiked: boolean
 }
 
 export interface CreatePost {

@@ -17,6 +17,13 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     Page<Post> findAllByUserIdAndIsDeletedFalseOrderByCreatedTimeDesc(Long userId, Pageable pageable);
     Page<Post> findAllByUserIdAndIsDeletedFalseOrderByViewsDesc(Long userId, Pageable pageable);
+    
+    // 좋아요 순서로 정렬 (서브쿼리 사용)
+    @Query("SELECT p FROM Post p WHERE p.isDeleted = false ORDER BY (SELECT COUNT(pl) FROM PostLike pl WHERE pl.post.id = p.id) DESC, p.createdTime DESC")
+    Page<Post> findAllByIsDeletedFalseOrderByLikesDesc(Pageable pageable);
+    
+    @Query("SELECT p FROM Post p WHERE p.user.id = :userId AND p.isDeleted = false ORDER BY (SELECT COUNT(pl) FROM PostLike pl WHERE pl.post.id = p.id) DESC, p.createdTime DESC")
+    Page<Post> findAllByUserIdAndIsDeletedFalseOrderByLikesDesc(@Param("userId") Long userId, Pageable pageable);
 
     // 조회수 증가 (updatedTime은 변경하지 않음)
     @Modifying

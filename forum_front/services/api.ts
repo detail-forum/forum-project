@@ -221,6 +221,13 @@ export const postApi = {
     cache.clear()
     return response.data
   },
+
+  toggleLike: async (id: number): Promise<ApiResponse<boolean>> => {
+    const response = await apiClient.post<ApiResponse<boolean>>(`/post/${id}/like`)
+    // 좋아요 후 목록 캐시 무효화
+    cache.clear()
+    return response.data
+  },
 }
 
 // Comment API

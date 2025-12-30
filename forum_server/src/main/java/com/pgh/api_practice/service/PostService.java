@@ -5,9 +5,11 @@ import com.pgh.api_practice.dto.PatchPostDTO;
 import com.pgh.api_practice.dto.PostDetailDTO;
 import com.pgh.api_practice.dto.PostListDTO;
 import com.pgh.api_practice.entity.Post;
+import com.pgh.api_practice.entity.PostLike;
 import com.pgh.api_practice.entity.Users;
 import com.pgh.api_practice.exception.ApplicationUnauthorizedException;
 import com.pgh.api_practice.exception.ResourceNotFoundException;
+import com.pgh.api_practice.repository.PostLikeRepository;
 import com.pgh.api_practice.repository.PostRepository;
 import com.pgh.api_practice.repository.UserRepository;
 import lombok.AllArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 @AllArgsConstructor
@@ -25,6 +28,7 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final PostLikeRepository postLikeRepository;
 
     /** ✅ 게시글 저장 */
     public long savePost(CreatePost dto) {
@@ -73,6 +77,20 @@ public class PostService {
             updateTime = post.getCreatedTime();
         }
 
+        // 좋아요 수 조회
+        long likeCount = postLikeRepository.countByPostId(post.getId());
+        
+        // 현재 사용자가 좋아요를 눌렀는지 확인
+        boolean isLiked = false;
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getName() != null && !"anonymousUser".equals(authentication.getName())) {
+            String username = authentication.getName();
+            Users user = userRepository.findByUsername(username).orElse(null);
+            if (user != null) {
+                isLiked = postLikeRepository.existsByPostIdAndUserId(post.getId(), user.getId());
+            }
+        }
+
         return PostDetailDTO.builder()
                 .title(post.getTitle())
                 .body(post.getBody())
@@ -81,6 +99,8 @@ public class PostService {
                 .createDateTime(post.getCreatedTime())
                 .updateDateTime(updateTime)
                 .profileImageUrl(post.getProfileImageUrl())
+                .likeCount(likeCount)
+                .isLiked(isLiked)
                 .build();
     }
 
@@ -93,6 +113,8 @@ public class PostService {
             posts = postRepository.findAllByIsDeletedFalseOrderByCreatedTimeDesc(pageable);
         } else if ("HITS".equalsIgnoreCase(sortType)) {
             posts = postRepository.findAllByIsDeletedFalseOrderByViewsDesc(pageable);
+        } else if ("LIKES".equalsIgnoreCase(sortType)) {
+            posts = postRepository.findAllByIsDeletedFalseOrderByLikesDesc(pageable);
         } else {
             posts = postRepository.findAllByIsDeletedFalseOrderByCreatedTimeDesc(pageable);
         }
@@ -105,6 +127,9 @@ public class PostService {
                 updateTime = post.getCreatedTime();
             }
             
+            // 좋아요 수 조회
+            long likeCount = postLikeRepository.countByPostId(post.getId());
+            
             return PostListDTO.builder()
                     .id(post.getId())
                     .title(post.getTitle())
@@ -113,6 +138,7 @@ public class PostService {
                     .createDateTime(post.getCreatedTime())
                     .updateDateTime(updateTime)
                     .profileImageUrl(post.getProfileImageUrl())
+                    .likeCount(likeCount)
                     .build();
         });
     }
@@ -136,6 +162,8 @@ public class PostService {
             posts = postRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedTimeDesc(user.getId(), pageable);
         } else if ("HITS".equalsIgnoreCase(sortType)) {
             posts = postRepository.findAllByUserIdAndIsDeletedFalseOrderByViewsDesc(user.getId(), pageable);
+        } else if ("LIKES".equalsIgnoreCase(sortType)) {
+            posts = postRepository.findAllByUserIdAndIsDeletedFalseOrderByLikesDesc(user.getId(), pageable);
         } else {
             posts = postRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedTimeDesc(user.getId(), pageable);
         }
@@ -148,6 +176,9 @@ public class PostService {
                 updateTime = post.getCreatedTime();
             }
             
+            // 좋아요 수 조회
+            long likeCount = postLikeRepository.countByPostId(post.getId());
+            
             return PostListDTO.builder()
                     .id(post.getId())
                     .title(post.getTitle())
@@ -156,8 +187,45 @@ public class PostService {
                     .createDateTime(post.getCreatedTime())
                     .updateDateTime(updateTime)
                     .profileImageUrl(post.getProfileImageUrl())
+                    .likeCount(likeCount)
                     .build();
         });
+    }
+
+    /** ✅ 게시글 좋아요 추가/삭제 */
+    @Transactional
+    public boolean toggleLike(long postId) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || "anonymousUser".equals(authentication.getName())) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+        
+        String username = authentication.getName();
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("유저를 찾을 수 없습니다."));
+        
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("게시글을 찾을 수 없습니다."));
+        
+        if (post.isDeleted()) {
+            throw new ResourceNotFoundException("삭제된 게시글입니다.");
+        }
+        
+        Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, user.getId());
+        
+        if (existingLike.isPresent()) {
+            // 좋아요 취소
+            postLikeRepository.delete(existingLike.get());
+            return false; // 좋아요 취소됨
+        } else {
+            // 좋아요 추가
+            PostLike like = PostLike.builder()
+                    .post(post)
+                    .user(user)
+                    .build();
+            postLikeRepository.save(like);
+            return true; // 좋아요 추가됨
+        }
     }
 
     /** ✅ 게시글 삭제 */
