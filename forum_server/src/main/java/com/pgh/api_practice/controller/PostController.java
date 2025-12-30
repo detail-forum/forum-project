@@ -9,6 +9,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/post")
 @AllArgsConstructor
@@ -91,5 +93,13 @@ public class PostController {
     public ResponseEntity<ApiResponse<Boolean>> toggleLike(@PathVariable long id) {
         boolean isLiked = postService.toggleLike(id);
         return ResponseEntity.ok(ApiResponse.ok(isLiked, isLiked ? "좋아요 추가" : "좋아요 취소"));
+    }
+    
+    /** ✅ 내가 사용한 태그 목록 조회 */
+    // GET http://localhost:8081/post/my-tags
+    @GetMapping("/my-tags")
+    public ResponseEntity<ApiResponse<List<String>>> getMyTags() {
+        List<String> tags = postService.getMyTags();
+        return ResponseEntity.ok(ApiResponse.ok(tags, "내 태그 조회 성공"));
     }
 }

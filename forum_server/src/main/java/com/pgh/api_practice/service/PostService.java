@@ -475,4 +475,19 @@ public class PostService {
             postRepository.flush();
         }
     }
+    
+    /** ✅ 내가 사용한 태그 목록 조회 */
+    @Transactional(readOnly = true)
+    public List<String> getMyTags() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || "anonymousUser".equals(authentication.getName())) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+        
+        String requestUsername = authentication.getName();
+        Users user = userRepository.findByUsername(requestUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("유저를 찾을 수 없습니다."));
+        
+        return postTagRepository.findDistinctTagNamesByUserId(user.getId());
+    }
 }

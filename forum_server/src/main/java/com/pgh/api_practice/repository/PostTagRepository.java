@@ -16,4 +16,7 @@ public interface PostTagRepository extends JpaRepository<PostTag, Long> {
     
     @Query("SELECT pt.post.id FROM PostTag pt WHERE pt.tag.name = :tagName AND pt.post.user.id = :userId AND pt.post.isDeleted = false")
     List<Long> findPostIdsByTagNameAndUserId(@Param("tagName") String tagName, @Param("userId") Long userId);
+    
+    @Query("SELECT DISTINCT pt.tag.name FROM PostTag pt WHERE pt.post.user.id = :userId AND pt.post.isDeleted = false ORDER BY pt.tag.name")
+    List<String> findDistinctTagNamesByUserId(@Param("userId") Long userId);
 }

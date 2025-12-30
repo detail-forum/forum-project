@@ -20,6 +20,8 @@ export default function MyPostsPage() {
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [tag, setTag] = useState<string | null>(null)
+  const [myTags, setMyTags] = useState<string[]>([])
+  const [loadingTags, setLoadingTags] = useState(false)
 
   useEffect(() => {
     const tagParam = searchParams.get('tag')
@@ -31,8 +33,23 @@ export default function MyPostsPage() {
       setShowLoginModal(true)
     } else {
       fetchPosts()
+      fetchMyTags()
     }
   }, [page, isAuthenticated, tag])
+
+  const fetchMyTags = async () => {
+    try {
+      setLoadingTags(true)
+      const response = await postApi.getMyTags()
+      if (response.success && response.data) {
+        setMyTags(response.data)
+      }
+    } catch (error) {
+      console.error('내 태그 목록 조회 실패:', error)
+    } finally {
+      setLoadingTags(false)
+    }
+  }
 
   const fetchPosts = async () => {
     try {
@@ -96,7 +113,7 @@ export default function MyPostsPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               {tag ? `#${tag} 태그 내 게시글` : '내 게시글'}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-4">
               {tag ? `#${tag} 태그가 포함된 ` : ''}작성한 게시글을 관리하세요
               {tag && (
                 <button
@@ -107,6 +124,28 @@ export default function MyPostsPage() {
                 </button>
               )}
             </p>
+            
+            {/* 내가 사용한 태그 목록 */}
+            {myTags.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-sm font-medium text-gray-700 mb-2">내가 사용한 태그:</h2>
+                <div className="flex flex-wrap gap-2">
+                  {myTags.map((tagName) => (
+                    <button
+                      key={tagName}
+                      onClick={() => router.push(`/my-posts?tag=${encodeURIComponent(tagName)}`)}
+                      className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                        tag === tagName
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      #{tagName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
         {loading && posts.length === 0 ? (

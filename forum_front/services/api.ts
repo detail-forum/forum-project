@@ -208,6 +208,11 @@ export const postApi = {
     return response.data
   },
 
+  getMyTags: async (): Promise<ApiResponse<string[]>> => {
+    const response = await apiClient.get<ApiResponse<string[]>>('/post/my-tags')
+    return response.data
+  },
+
   getPostDetail: async (id: number): Promise<ApiResponse<PostDetailDTO>> => {
     // 게시글 상세는 조회수 증가가 있으므로 캐시하지 않음
     const response = await apiClient.get<ApiResponse<PostDetailDTO>>(`/post/${id}`)
