@@ -26,6 +26,14 @@ const authSlice = createSlice({
         localStorage.setItem('refreshToken', action.payload.refreshToken)
       }
     },
+    updateTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken: string }>) => {
+      state.accessToken = action.payload.accessToken
+      state.refreshToken = action.payload.refreshToken
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('accessToken', action.payload.accessToken)
+        localStorage.setItem('refreshToken', action.payload.refreshToken)
+      }
+    },
     logout: (state) => {
       // Redux 상태 초기화
       state.accessToken = null
@@ -41,6 +49,6 @@ const authSlice = createSlice({
   },
 })
 
-export const { setCredentials, logout } = authSlice.actions
+export const { setCredentials, updateTokens, logout } = authSlice.actions
 export default authSlice.reducer
 

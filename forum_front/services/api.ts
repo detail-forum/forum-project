@@ -1,9 +1,10 @@
-import axios from 'axios'
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import type {
   ApiResponse,
   LoginRequest,
   RegisterRequest,
   LoginResponse,
+  RefreshTokenRequest,
   PostListDTO,
   PostDetailDTO,
   CreatePost,
@@ -40,17 +41,37 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// 응답 인터셉터: 에러 처리
+// 토큰 재발급 플래그 (무한 루프 방지)
+let isRefreshing = false
+let failedQueue: Array<{
+  resolve: (value?: any) => void
+  reject: (error?: any) => void
+}> = []
+
+const processQueue = (error: AxiosError | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token)
+    }
+  })
+  failedQueue = []
+}
+
+// 응답 인터셉터: 에러 처리 및 토큰 자동 재발급
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+
     // 에러 상세 정보 로깅
     if (error.response) {
       console.error('API Error:', {
         status: error.response.status,
         statusText: error.response.statusText,
-        url: error.config?.url,
-        method: error.config?.method,
+        url: originalRequest?.url,
+        method: originalRequest?.method,
         data: error.response.data,
       })
     } else if (error.request) {
@@ -59,12 +80,76 @@ apiClient.interceptors.response.use(
       console.error('Error:', error.message)
     }
 
-    // 401 에러 처리
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      window.location.href = '/'
+    // 401 에러 처리 - 토큰 재발급 시도
+    if (error.response?.status === 401 && typeof window !== 'undefined' && originalRequest && !originalRequest._retry) {
+      if (isRefreshing) {
+        // 이미 재발급 중이면 대기열에 추가
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then((token) => {
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${token}`
+            }
+            return apiClient(originalRequest)
+          })
+          .catch((err) => {
+            return Promise.reject(err)
+          })
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      const refreshToken = localStorage.getItem('refreshToken')
+
+      if (!refreshToken) {
+        // RefreshToken이 없으면 로그아웃
+        processQueue(error)
+        isRefreshing = false
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        window.location.href = '/'
+        return Promise.reject(error)
+      }
+
+      try {
+        // RefreshToken으로 새 AccessToken 발급
+        const response = await axios.post<ApiResponse<LoginResponse>>(
+          `${API_BASE_URL}/auth/refresh`,
+          { refreshToken } as RefreshTokenRequest
+        )
+
+        if (response.data.success && response.data.data) {
+          const { accessToken, refreshToken: newRefreshToken } = response.data.data
+
+          // 새 토큰 저장
+          localStorage.setItem('accessToken', accessToken)
+          localStorage.setItem('refreshToken', newRefreshToken)
+
+          // 대기 중인 요청들 처리
+          processQueue(null, accessToken)
+
+          // 원래 요청 재시도
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          }
+          isRefreshing = false
+          return apiClient(originalRequest)
+        } else {
+          throw new Error('토큰 재발급 실패')
+        }
+      } catch (refreshError) {
+        // RefreshToken도 만료되었거나 유효하지 않음
+        processQueue(refreshError as AxiosError)
+        isRefreshing = false
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        window.location.href = '/'
+        return Promise.reject(refreshError)
+      }
     }
+
     return Promise.reject(error)
   }
 )
@@ -76,6 +161,9 @@ export const authApi = {
 
   register: (data: RegisterRequest) =>
     apiClient.post<ApiResponse<void>>('/auth/register', data).then(r => r.data),
+
+  refreshToken: (data: RefreshTokenRequest) =>
+    apiClient.post<ApiResponse<LoginResponse>>('/auth/refresh', data).then(r => r.data),
 }
 
 // Post API

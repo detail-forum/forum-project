@@ -3,6 +3,7 @@ package com.pgh.api_practice.controller;
 import com.pgh.api_practice.dto.LoginRequestDTO;
 import com.pgh.api_practice.dto.auth.RegisterRequestDTO;
 import com.pgh.api_practice.dto.auth.LoginResponseDTO;
+import com.pgh.api_practice.dto.auth.RefreshTokenRequestDTO;
 import com.pgh.api_practice.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,14 @@ public class AuthController {
     ) {
     LoginResponseDTO result = authService.login(loginRequestDTO);
     return ResponseEntity.ok(ApiResponse.ok(result,"로그인이 완료되었습니다"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<LoginResponseDTO>> refresh(
+            @Valid @RequestBody RefreshTokenRequestDTO refreshTokenRequestDTO
+    ) {
+        LoginResponseDTO result = authService.refreshToken(refreshTokenRequestDTO);
+        return ResponseEntity.ok(ApiResponse.ok(result, "토큰이 재발급되었습니다."));
     }
 }
 

@@ -21,6 +21,10 @@ export interface LoginResponse {
   refreshToken: string
 }
 
+export interface RefreshTokenRequest {
+  refreshToken: string
+}
+
 export interface PostListDTO {
   id: number
   title: string

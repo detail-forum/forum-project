@@ -3,9 +3,12 @@ package com.pgh.api_practice.service;
 
 import com.pgh.api_practice.dto.LoginRequestDTO;
 import com.pgh.api_practice.dto.auth.LoginResponseDTO;
+import com.pgh.api_practice.dto.auth.RefreshTokenRequestDTO;
 import com.pgh.api_practice.dto.auth.RegisterRequestDTO;
 import com.pgh.api_practice.entity.RefreshToken;
 import com.pgh.api_practice.entity.Users;
+import com.pgh.api_practice.exception.RefreshTokenExpiredException;
+import com.pgh.api_practice.exception.ResourceNotFoundException;
 import com.pgh.api_practice.exception.UserAlreadyExistException;
 import com.pgh.api_practice.global.TokenProvider;
 import com.pgh.api_practice.repository.AuthRepository;
@@ -16,6 +19,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -82,6 +86,44 @@ public class AuthService {
 
 
         return new LoginResponseDTO(accessToken, refreshToken);
+    }
+
+    // ✅ 토큰 재발급
+    @Transactional
+    public LoginResponseDTO refreshToken(RefreshTokenRequestDTO dto) {
+        // 1) RefreshToken 검증
+        if (!tokenProvider.validateToken(dto.getRefreshToken())) {
+            throw new RefreshTokenExpiredException("리프레시 토큰이 만료되었습니다.");
+        }
+
+        // 2) DB에서 RefreshToken 조회
+        RefreshToken refreshTokenEntity = refreshTokenRepository.findByRefreshToken(dto.getRefreshToken())
+                .orElseThrow(() -> new ResourceNotFoundException("리프레시 토큰을 찾을 수 없습니다."));
+
+        // 3) RefreshToken 만료 시간 확인
+        if (refreshTokenEntity.getExpiryDateTime().isBefore(LocalDateTime.now())) {
+            refreshTokenRepository.delete(refreshTokenEntity);
+            throw new RefreshTokenExpiredException("리프레시 토큰이 만료되었습니다.");
+        }
+
+        // 4) RefreshToken에서 username 추출
+        String username = tokenProvider.getUsername(dto.getRefreshToken());
+
+        // 5) 새로운 AccessToken 생성
+        String newAccessToken = tokenProvider.createAccessToken(username);
+
+        // 6) 새로운 RefreshToken 생성 (선택적 - 기존 토큰 유지하거나 새로 발급)
+        String newRefreshToken = tokenProvider.createRefreshToken(username);
+
+        // 7) 기존 RefreshToken 삭제하고 새로운 RefreshToken 저장
+        refreshTokenRepository.delete(refreshTokenEntity);
+        RefreshToken newRefreshTokenEntity = RefreshToken.builder()
+                .refreshToken(newRefreshToken)
+                .expiryDateTime(LocalDateTime.now().plusDays(7))
+                .build();
+        refreshTokenRepository.save(newRefreshTokenEntity);
+
+        return new LoginResponseDTO(newAccessToken, newRefreshToken);
     }
 
 }
