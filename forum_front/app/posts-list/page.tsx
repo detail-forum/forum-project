@@ -44,7 +44,7 @@ function PostsListContent() {
   const fetchPosts = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await postApi.getPostList(page, 10, sortType, tag || undefined, searchKeyword || undefined)
+      const response = await postApi.getPostList(page, 12, sortType, tag || undefined, searchKeyword || undefined)
       if (response.success && response.data) {
         setPosts(response.data.content || [])
         setTotalPages(response.data.totalPages || 0)
