@@ -102,21 +102,43 @@ function UserProfileContent() {
 
     setFollowLoading(true)
     const previousFollowing = following
+    const newFollowingState = !following
     
-    // 낙관적 업데이트
-    setFollowing(!following)
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    setFollowing(newFollowingState)
+    // userInfo도 즉시 업데이트
+    if (userInfo) {
+      setUserInfo({
+        ...userInfo,
+        isFollowing: newFollowingState,
+      })
+    }
     
     try {
       if (previousFollowing) {
         const response = await followApi.unfollowUser(userInfo.id)
         if (!response.success) {
+          // 실패 시 이전 상태로 복원
           setFollowing(previousFollowing)
+          if (userInfo) {
+            setUserInfo({
+              ...userInfo,
+              isFollowing: previousFollowing,
+            })
+          }
           throw new Error(response.message || '언팔로우에 실패했습니다.')
         }
       } else {
         const response = await followApi.followUser(userInfo.id)
         if (!response.success) {
+          // 실패 시 이전 상태로 복원
           setFollowing(previousFollowing)
+          if (userInfo) {
+            setUserInfo({
+              ...userInfo,
+              isFollowing: previousFollowing,
+            })
+          }
           throw new Error(response.message || '팔로우에 실패했습니다.')
         }
       }
@@ -230,12 +252,12 @@ function UserProfileContent() {
                   onClick={handleFollow}
                   disabled={followLoading}
                   className={`mt-4 px-6 py-2 rounded-lg transition-colors ${
-                    userInfo.isFollowing
+                    following
                       ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       : 'bg-primary text-white hover:bg-secondary'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  {followLoading ? '처리 중...' : userInfo.isFollowing ? '언팔로우' : '팔로우'}
+                  {followLoading ? '처리 중...' : following ? '언팔로우' : '팔로우'}
                 </button>
               )}
               {isOwnProfile && (

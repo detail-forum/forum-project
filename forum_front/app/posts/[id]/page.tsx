@@ -72,9 +72,17 @@ export default function PostDetailPage() {
 
     setFollowLoading(true)
     const previousFollowing = following // 이전 상태 저장
+    const newFollowingState = !following
     
     // 낙관적 업데이트: 즉시 UI 업데이트
-    setFollowing(!following)
+    setFollowing(newFollowingState)
+    // authorInfo도 즉시 업데이트
+    if (authorInfo) {
+      setAuthorInfo({
+        ...authorInfo,
+        isFollowing: newFollowingState,
+      })
+    }
     
     try {
       if (previousFollowing) {
@@ -82,6 +90,12 @@ export default function PostDetailPage() {
         if (!response.success) {
           // 실패 시 이전 상태로 복원
           setFollowing(previousFollowing)
+          if (authorInfo) {
+            setAuthorInfo({
+              ...authorInfo,
+              isFollowing: previousFollowing,
+            })
+          }
           throw new Error(response.message || '언팔로우에 실패했습니다.')
         }
       } else {
@@ -89,6 +103,12 @@ export default function PostDetailPage() {
         if (!response.success) {
           // 실패 시 이전 상태로 복원
           setFollowing(previousFollowing)
+          if (authorInfo) {
+            setAuthorInfo({
+              ...authorInfo,
+              isFollowing: previousFollowing,
+            })
+          }
           throw new Error(response.message || '팔로우에 실패했습니다.')
         }
       }
@@ -579,12 +599,12 @@ export default function PostDetailPage() {
                               onClick={handleFollow}
                               disabled={followLoading}
                               className={`ml-2 px-3 py-1 text-xs rounded-lg transition-colors ${
-                                authorInfo?.isFollowing
+                                following
                                   ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                   : 'bg-primary text-white hover:bg-secondary'
                               } disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
-                              {followLoading ? '처리 중...' : authorInfo?.isFollowing ? '언팔로우' : '팔로우'}
+                              {followLoading ? '처리 중...' : following ? '언팔로우' : '팔로우'}
                             </button>
                           )}
                         </>
