@@ -100,7 +100,7 @@ function PostsListContent() {
           </div>
         </div>
 
-        {/* 게시글 목록 */}
+        {/* 게시글 목록 - 그리드 레이아웃 */}
         {loading && posts.length === 0 ? (
           <PostListSkeleton />
         ) : posts.length === 0 ? (
@@ -108,7 +108,7 @@ function PostsListContent() {
             게시글이 없습니다.
           </div>
         ) : (
-          <div className="space-y-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
             {posts.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}

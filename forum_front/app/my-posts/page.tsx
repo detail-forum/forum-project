@@ -7,9 +7,7 @@ import type { RootState } from '@/store/store'
 import { postApi } from '@/services/api'
 import type { PostListDTO } from '@/types/api'
 import Header from '@/components/Header'
-import Link from 'next/link'
-import { formatDistanceToNow } from 'date-fns'
-import { ko } from 'date-fns/locale'
+import PostCard from '@/components/PostCard'
 
 export default function MyPostsPage() {
   const router = useRouter()
@@ -60,14 +58,6 @@ export default function MyPostsPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true, locale: ko })
-    } catch {
-      return dateString
-    }
-  }
-
   if (!isAuthenticated) {
     return null
   }
@@ -88,34 +78,28 @@ export default function MyPostsPage() {
             작성한 게시글이 없습니다.
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {posts.map((post) => (
-              <div
-                key={post.id}
-                className="p-6 bg-white border border-gray-200 rounded-lg hover:border-primary hover:shadow-md transition-all"
-              >
-                <Link href={`/posts/${post.id}`}>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">
-                    {post.title}
-                  </h3>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>{post.username}</span>
-                    <span>{formatDate(post.createDateTime)}</span>
-                  </div>
-                </Link>
-                <div className="mt-4 pt-4 border-t flex justify-end space-x-2">
+              <div key={post.id} className="relative group">
+                <PostCard post={post} />
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2 z-10">
                   <button
                     onClick={(e) => {
                       e.preventDefault()
+                      e.stopPropagation()
                       router.push(`/posts/${post.id}/edit`)
                     }}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-sm"
+                    className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-xs shadow-lg"
                   >
                     수정
                   </button>
                   <button
-                    onClick={(e) => handleDelete(post.id, e)}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleDelete(post.id, e)
+                    }}
+                    className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs shadow-lg"
                   >
                     삭제
                   </button>

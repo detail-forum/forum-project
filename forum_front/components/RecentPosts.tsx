@@ -52,7 +52,7 @@ export default function RecentPosts() {
           아직 게시글이 없습니다.
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {posts.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}

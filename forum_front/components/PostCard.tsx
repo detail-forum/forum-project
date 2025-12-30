@@ -55,10 +55,10 @@ function PostCard({ post }: PostCardProps) {
     <Link
       href={`/posts/${post.id}`}
       prefetch={true}
-      className="block bg-white border border-gray-200 rounded-lg hover:border-primary hover:shadow-lg transition-all overflow-hidden"
+      className="block bg-white border border-gray-200 rounded-lg hover:border-primary hover:shadow-lg transition-all overflow-hidden h-full flex flex-col"
     >
-      {/* 이미지 영역 */}
-      <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
+      {/* 이미지 영역 - 정사각형 비율 */}
+      <div className="relative w-full aspect-square bg-gray-100 overflow-hidden">
         {defaultImageUrl && (
           <Image
             src={getImageUrl()}
@@ -70,23 +70,23 @@ function PostCard({ post }: PostCardProps) {
           />
         )}
         {/* 오버레이 그라데이션 */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         {/* 제목 오버레이 */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          <h3 className="text-white font-semibold text-lg line-clamp-2 drop-shadow-lg">
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <h3 className="text-white font-semibold text-base line-clamp-2 drop-shadow-lg">
             {post.title}
           </h3>
         </div>
       </div>
       
-      {/* 카드 하단 정보 */}
-      <div className="p-4">
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <div className="flex items-center space-x-4">
-            <span className="font-medium">{post.username}</span>
-            <span className="text-gray-500">조회수: {(post.views ?? post.Views) ?? 0}</span>
-          </div>
+      {/* 카드 하단 정보 - 컴팩트하게 */}
+      <div className="p-3 flex-1 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+          <span className="font-medium text-gray-800">{post.username}</span>
           <span className="text-gray-500">{formatDate(post.createDateTime)}</span>
+        </div>
+        <div className="text-xs text-gray-500">
+          조회수: {(post.views ?? post.Views) ?? 0}
         </div>
       </div>
     </Link>
