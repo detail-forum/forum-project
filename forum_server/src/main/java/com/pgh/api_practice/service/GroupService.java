@@ -316,9 +316,16 @@ public class GroupService {
         boolean isAdmin = false;
 
         if (currentUser != null) {
-            Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
-            if (member.isPresent()) {
-                isAdmin = member.get().isAdmin();
+            // 모임 주인인지 확인
+            boolean isOwner = group.getOwner().getId().equals(currentUser.getId());
+            if (isOwner) {
+                isAdmin = true; // 모임 주인은 항상 관리자
+            } else {
+                // 멤버인지 확인
+                Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+                if (member.isPresent()) {
+                    isAdmin = member.get().isAdmin();
+                }
             }
         }
 
@@ -483,9 +490,14 @@ public class GroupService {
             if (currentUser == null) {
                 throw new ApplicationUnauthorizedException("인증이 필요합니다.");
             }
-            Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
-            if (member.isEmpty() || !member.get().isAdmin()) {
-                throw new ApplicationUnauthorizedException("관리자만 관리자방을 볼 수 있습니다.");
+            // 모임 주인인지 확인
+            boolean isOwner = group.getOwner().getId().equals(currentUser.getId());
+            if (!isOwner) {
+                // 멤버인지 확인
+                Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+                if (member.isEmpty() || !member.get().isAdmin()) {
+                    throw new ApplicationUnauthorizedException("관리자만 관리자방을 볼 수 있습니다.");
+                }
             }
         }
 

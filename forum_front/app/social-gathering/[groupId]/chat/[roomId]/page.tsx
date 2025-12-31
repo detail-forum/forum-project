@@ -60,6 +60,8 @@ export default function ChatRoomPage() {
     try {
       const response = await groupApi.getGroupDetail(groupId)
       if (response.success && response.data) {
+        console.log('Group detail:', response.data)
+        console.log('Is Admin:', response.data.isAdmin)
         setGroup(response.data)
       }
     } catch (error) {
@@ -91,7 +93,10 @@ export default function ChatRoomPage() {
       const response = await groupApi.getChatMessages(groupId, roomId, 0, 100)
       if (response.success && response.data) {
         // 최신 메시지가 아래에 오도록 역순 정렬
-        setMessages([...response.data].reverse())
+        const reversedMessages = [...response.data].reverse()
+        console.log('Messages:', reversedMessages)
+        console.log('First message isAdmin:', reversedMessages[0]?.isAdmin)
+        setMessages(reversedMessages)
       }
     } catch (error) {
       console.error('채팅 메시지 조회 실패:', error)
