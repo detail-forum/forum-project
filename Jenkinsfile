@@ -190,6 +190,13 @@ pipeline {
                         echo [WARN] Backend restart may have failed, trying start...
                         "%NSSM%" start forum-backend
                     )
+                    
+                    REM 백엔드 시작 확인 및 로그 출력
+                    echo Checking backend service status...
+                    "%NSSM%" status forum-backend
+                    echo.
+                    echo Backend service logs (last 20 lines):
+                    type "%DEPLOY_BACKEND%\\logs\\spring.log" 2>nul | findstr /N "." | findstr /R "[0-9]*:" | more +0 | findstr /R "[0-9]*:" | tail -20 2>nul || echo [INFO] Log file not found or empty
 
                     REM Frontend 시작
                     echo Starting frontend service...
