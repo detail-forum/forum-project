@@ -350,6 +350,95 @@ export const commentApi = {
   },
 }
 
+// Group API
+export const groupApi = {
+  createGroup: async (data: import('@/types/api').CreateGroupDTO): Promise<ApiResponse<number>> => {
+    const response = await apiClient.post<ApiResponse<number>>('/group', data)
+    return response.data
+  },
+
+  getGroupList: async (page: number = 0, size: number = 10): Promise<ApiResponse<any>> => {
+    const response = await apiClient.get<ApiResponse<any>>('/group', {
+      params: { page, size },
+    })
+    return response.data
+  },
+
+  getGroupDetail: async (groupId: number): Promise<ApiResponse<import('@/types/api').GroupDetailDTO>> => {
+    const response = await apiClient.get<ApiResponse<import('@/types/api').GroupDetailDTO>>(`/group/${groupId}`)
+    return response.data
+  },
+
+  joinGroup: async (groupId: number): Promise<ApiResponse<void>> => {
+    const response = await apiClient.post<ApiResponse<void>>(`/group/${groupId}/join`)
+    return response.data
+  },
+
+  leaveGroup: async (groupId: number): Promise<ApiResponse<void>> => {
+    const response = await apiClient.post<ApiResponse<void>>(`/group/${groupId}/leave`)
+    return response.data
+  },
+
+  deleteGroup: async (groupId: number): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/group/${groupId}`)
+    return response.data
+  },
+
+  getChatRooms: async (groupId: number): Promise<ApiResponse<import('@/types/api').GroupChatRoomDTO[]>> => {
+    const response = await apiClient.get<ApiResponse<import('@/types/api').GroupChatRoomDTO[]>>(`/group/${groupId}/chat-rooms`)
+    return response.data
+  },
+
+  createChatRoom: async (groupId: number, data: import('@/types/api').CreateGroupChatRoomDTO): Promise<ApiResponse<number>> => {
+    const response = await apiClient.post<ApiResponse<number>>(`/group/${groupId}/chat-rooms`, data)
+    return response.data
+  },
+
+  deleteChatRoom: async (groupId: number, roomId: number): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/group/${groupId}/chat-rooms/${roomId}`)
+    return response.data
+  },
+
+  getGroupPostList: async (groupId: number, page: number = 0, size: number = 10): Promise<ApiResponse<any>> => {
+    const response = await apiClient.get<ApiResponse<any>>(`/group/${groupId}/posts`, {
+      params: { page, size },
+    })
+    return response.data
+  },
+
+  createGroupPost: async (groupId: number, data: import('@/types/api').CreateGroupPostDTO): Promise<ApiResponse<number>> => {
+    const response = await apiClient.post<ApiResponse<number>>(`/group/${groupId}/posts`, data)
+    return response.data
+  },
+
+  getGroupPostDetail: async (groupId: number, postId: number): Promise<ApiResponse<import('@/types/api').GroupPostDetailDTO>> => {
+    const response = await apiClient.get<ApiResponse<import('@/types/api').GroupPostDetailDTO>>(`/group/${groupId}/posts/${postId}`)
+    return response.data
+  },
+
+  updateGroupPost: async (groupId: number, postId: number, data: import('@/types/api').CreateGroupPostDTO): Promise<ApiResponse<void>> => {
+    const response = await apiClient.patch<ApiResponse<void>>(`/group/${groupId}/posts/${postId}`, data)
+    return response.data
+  },
+
+  deleteGroupPost: async (groupId: number, postId: number): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/group/${groupId}/posts/${postId}`)
+    return response.data
+  },
+
+  sendChatMessage: async (groupId: number, roomId: number, data: import('@/types/api').CreateGroupChatMessageDTO): Promise<ApiResponse<number>> => {
+    const response = await apiClient.post<ApiResponse<number>>(`/group/${groupId}/chat-rooms/${roomId}/messages`, data)
+    return response.data
+  },
+
+  getChatMessages: async (groupId: number, roomId: number, page: number = 0, size: number = 50): Promise<ApiResponse<import('@/types/api').GroupChatMessageDTO[]>> => {
+    const response = await apiClient.get<ApiResponse<import('@/types/api').GroupChatMessageDTO[]>>(`/group/${groupId}/chat-rooms/${roomId}/messages`, {
+      params: { page, size },
+    })
+    return response.data
+  },
+}
+
 // Image Upload API
 export const imageUploadApi = {
   uploadImage: async (file: File): Promise<ApiResponse<{ url: string; filename: string; originalFilename: string }>> => {

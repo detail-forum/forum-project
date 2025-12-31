@@ -124,3 +124,96 @@ export interface ChangePassword {
   currentPassword: string
   newPassword: string
 }
+
+// Group 관련 타입
+export interface GroupListDTO {
+  id: number
+  name: string
+  description: string
+  ownerUsername: string
+  ownerNickname: string
+  profileImageUrl?: string
+  memberCount: number
+  createdTime: string
+  isMember: boolean
+  isAdmin: boolean
+}
+
+export interface GroupDetailDTO {
+  id: number
+  name: string
+  description: string
+  ownerUsername: string
+  ownerNickname: string
+  profileImageUrl?: string
+  memberCount: number
+  createdTime: string
+  updatedTime: string
+  isMember: boolean
+  isAdmin: boolean
+}
+
+export interface CreateGroupDTO {
+  name: string
+  description?: string
+  profileImageUrl?: string
+}
+
+export interface GroupPostListDTO {
+  id: number
+  title: string
+  body: string
+  username: string
+  nickname: string
+  Views?: string
+  createDateTime: string
+  updateDateTime: string
+  profileImageUrl?: string
+}
+
+export interface GroupPostDetailDTO {
+  id: number
+  title: string
+  body: string
+  username: string
+  nickname: string
+  Views?: string
+  createDateTime: string
+  updateDateTime: string
+  profileImageUrl?: string
+  isAuthor: boolean
+  canEdit: boolean
+  canDelete: boolean
+}
+
+export interface CreateGroupPostDTO {
+  title: string
+  body: string
+  profileImageUrl?: string
+}
+
+export interface GroupChatRoomDTO {
+  id: number
+  name: string
+  description?: string
+  isAdminRoom: boolean
+  createdTime: string
+}
+
+export interface CreateGroupChatRoomDTO {
+  name: string
+  description?: string
+}
+
+export interface GroupChatMessageDTO {
+  id: number
+  message: string
+  username: string
+  nickname: string
+  profileImageUrl?: string
+  createdTime: string
+}
+
+export interface CreateGroupChatMessageDTO {
+  message: string
+}

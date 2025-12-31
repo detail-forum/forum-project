@@ -111,14 +111,21 @@ export default function Header({ onLoginClick }: HeaderProps) {
                       prefetch={true}
                     >
                       게시글 작성
-                    </Link>
-                    <Link
-                      href="/my-posts"
-                      className="text-gray-700 hover:text-primary transition-colors"
-                      prefetch={true}
-                    >
-                      내 게시글
-                    </Link>
+                </Link>
+                <Link
+                  href="/my-posts"
+                  className="text-gray-700 hover:text-primary transition-colors"
+                  prefetch={true}
+                >
+                  내 게시글
+                </Link>
+                <Link
+                  href="/social-gathering"
+                  className="text-gray-700 hover:text-primary transition-colors"
+                  prefetch={true}
+                >
+                  모임
+                </Link>
                   </>
                 ) : (
                   <>
@@ -130,16 +137,16 @@ export default function Header({ onLoginClick }: HeaderProps) {
                       className="text-gray-700 hover:text-primary transition-colors"
                     >
                       게시글 작성
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        onLoginClick()
-                      }}
-                      className="text-gray-700 hover:text-primary transition-colors"
-                    >
-                      내 게시글
-                    </button>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      onLoginClick()
+                    }}
+                    className="text-gray-700 hover:text-primary transition-colors"
+                  >
+                    내 게시글
+                  </button>
                   </>
                 )}
             {mounted && isAuthenticated ? (

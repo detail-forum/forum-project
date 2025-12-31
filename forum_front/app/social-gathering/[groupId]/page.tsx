@@ -1,0 +1,343 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { useSelector } from 'react-redux'
+import type { RootState } from '@/store/store'
+import { groupApi } from '@/services/api'
+import type { GroupDetailDTO, GroupPostListDTO, GroupChatRoomDTO } from '@/types/api'
+import Header from '@/components/Header'
+import LoginModal from '@/components/LoginModal'
+import { format } from 'date-fns'
+import { ko } from 'date-fns/locale'
+
+type TabType = 'intro' | 'posts' | 'chat'
+
+export default function GroupDetailPage() {
+  const params = useParams()
+  const router = useRouter()
+  const groupId = Number(params.groupId)
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
+  const [activeTab, setActiveTab] = useState<TabType>('intro')
+  const [group, setGroup] = useState<GroupDetailDTO | null>(null)
+  const [posts, setPosts] = useState<GroupPostListDTO[]>([])
+  const [chatRooms, setChatRooms] = useState<GroupChatRoomDTO[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+
+  useEffect(() => {
+    if (groupId) {
+      fetchGroupDetail()
+      fetchChatRooms()
+    }
+  }, [groupId])
+
+  useEffect(() => {
+    if (activeTab === 'posts' && groupId) {
+      fetchPosts()
+    }
+  }, [activeTab, groupId])
+
+  const fetchGroupDetail = async () => {
+    try {
+      setLoading(true)
+      const response = await groupApi.getGroupDetail(groupId)
+      if (response.success && response.data) {
+        setGroup(response.data)
+      }
+    } catch (error) {
+      console.error('모임 상세 조회 실패:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchPosts = async () => {
+    try {
+      const response = await groupApi.getGroupPostList(groupId, 0, 20)
+      if (response.success && response.data) {
+        // Page 객체에서 content 추출
+        const content = response.data.content || response.data
+        setPosts(Array.isArray(content) ? content : [])
+      }
+    } catch (error) {
+      console.error('모임 활동 게시물 조회 실패:', error)
+    }
+  }
+
+  const fetchChatRooms = async () => {
+    try {
+      const response = await groupApi.getChatRooms(groupId)
+      if (response.success && response.data) {
+        setChatRooms(response.data)
+      }
+    } catch (error) {
+      console.error('채팅방 목록 조회 실패:', error)
+    }
+  }
+
+  const handleJoin = async () => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true)
+      return
+    }
+
+    try {
+      const response = await groupApi.joinGroup(groupId)
+      if (response.success) {
+        fetchGroupDetail()
+        alert('모임에 가입되었습니다!')
+      }
+    } catch (error: any) {
+      console.error('모임 가입 실패:', error)
+      alert(error.response?.data?.message || '모임 가입에 실패했습니다.')
+    }
+  }
+
+  const handleLeave = async () => {
+    if (!confirm('정말 모임에서 탈퇴하시겠습니까?')) return
+
+    try {
+      const response = await groupApi.leaveGroup(groupId)
+      if (response.success) {
+        fetchGroupDetail()
+        alert('모임에서 탈퇴되었습니다.')
+      }
+    } catch (error: any) {
+      console.error('모임 탈퇴 실패:', error)
+      alert(error.response?.data?.message || '모임 탈퇴에 실패했습니다.')
+    }
+  }
+
+  const handlePostClick = (postId: number) => {
+    router.push(`/social-gathering/${groupId}/posts/${postId}`)
+  }
+
+  const handleChatRoomClick = (roomId: number) => {
+    router.push(`/social-gathering/${groupId}/chat/${roomId}`)
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <Header onLoginClick={() => {}} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+          로딩 중...
+        </div>
+      </div>
+    )
+  }
+
+  if (!group) {
+    return (
+      <div>
+        <Header onLoginClick={() => {}} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+          모임을 찾을 수 없습니다.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <Header onLoginClick={() => setShowLoginModal(true)} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* 모임 헤더 */}
+        <div className="mb-8">
+          {group.profileImageUrl && (
+            <img
+              src={group.profileImageUrl}
+              alt={group.name}
+              className="w-full h-64 object-cover rounded-lg mb-4"
+            />
+          )}
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">{group.name}</h1>
+              <p className="text-gray-600 mb-4">{group.description}</p>
+              <div className="flex gap-4 text-sm text-gray-500">
+                <span>멤버: {group.memberCount}명</span>
+                <span>주인: {group.ownerNickname}</span>
+                <span>
+                  생성일: {format(new Date(group.createdTime), 'yyyy년 MM월 dd일', { locale: ko })}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {group.isMember ? (
+                <>
+                  <button
+                    onClick={handleLeave}
+                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
+                  >
+                    탈퇴하기
+                  </button>
+                  {group.isAdmin && (
+                    <button
+                      onClick={() => router.push(`/social-gathering/${groupId}/settings`)}
+                      className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition"
+                    >
+                      설정
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={handleJoin}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
+                >
+                  가입하기
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 탭 */}
+        <div className="border-b mb-6">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveTab('intro')}
+              className={`pb-2 px-4 ${
+                activeTab === 'intro'
+                  ? 'border-b-2 border-blue-500 text-blue-500 font-semibold'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              소개
+            </button>
+            <button
+              onClick={() => setActiveTab('posts')}
+              className={`pb-2 px-4 ${
+                activeTab === 'posts'
+                  ? 'border-b-2 border-blue-500 text-blue-500 font-semibold'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              활동
+            </button>
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`pb-2 px-4 ${
+                activeTab === 'chat'
+                  ? 'border-b-2 border-blue-500 text-blue-500 font-semibold'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              채팅방
+            </button>
+          </div>
+        </div>
+
+        {/* 탭 컨텐츠 */}
+        {activeTab === 'intro' && (
+          <div className="prose max-w-none">
+            <h2 className="text-2xl font-bold mb-4">모임 소개</h2>
+            <p className="text-gray-700 whitespace-pre-wrap">{group.description || '모임 설명이 없습니다.'}</p>
+          </div>
+        )}
+
+        {activeTab === 'posts' && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">모임 활동</h2>
+              {group.isMember && (
+                <button
+                  onClick={() => router.push(`/social-gathering/${groupId}/posts/create`)}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
+                >
+                  글쓰기
+                </button>
+              )}
+            </div>
+            {posts.length === 0 ? (
+              <div className="text-center text-gray-500 py-12">등록된 활동이 없습니다.</div>
+            ) : (
+              <div className="space-y-4">
+                {posts.map((post) => (
+                  <div
+                    key={post.id}
+                    onClick={() => handlePostClick(post.id)}
+                    className="border p-4 rounded hover:shadow-lg transition cursor-pointer"
+                  >
+                    <h3 className="text-lg font-semibold mb-2">{post.title}</h3>
+                    <p className="text-gray-600 text-sm line-clamp-2 mb-2">{post.body}</p>
+                    <div className="flex justify-between items-center text-sm text-gray-500">
+                      <span>{post.nickname} ({post.username})</span>
+                      <span>
+                        {format(new Date(post.createDateTime), 'yyyy-MM-dd HH:mm', { locale: ko })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'chat' && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">채팅방</h2>
+              {group.isAdmin && (
+                <button
+                  onClick={() => {
+                    const name = prompt('채팅방 이름을 입력하세요:')
+                    if (name && name.length >= 2) {
+                      groupApi
+                        .createChatRoom(groupId, { name, description: '' })
+                        .then(() => {
+                          fetchChatRooms()
+                        })
+                        .catch((error) => {
+                          console.error('채팅방 생성 실패:', error)
+                          alert('채팅방 생성에 실패했습니다.')
+                        })
+                    }
+                  }}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
+                >
+                  채팅방 추가
+                </button>
+              )}
+            </div>
+            {chatRooms.length === 0 ? (
+              <div className="text-center text-gray-500 py-12">채팅방이 없습니다.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {chatRooms.map((room) => (
+                  <div
+                    key={room.id}
+                    onClick={() => handleChatRoomClick(room.id)}
+                    className="border p-4 rounded hover:shadow-lg transition cursor-pointer"
+                  >
+                    <h3 className="text-lg font-semibold mb-2">
+                      {room.name}
+                      {room.isAdminRoom && (
+                        <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                          관리자
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-gray-600 text-sm">{room.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showLoginModal && (
+        <LoginModal
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={() => {
+            setShowLoginModal(false)
+            fetchGroupDetail()
+          }}
+        />
+      )}
+    </div>
+  )
+}

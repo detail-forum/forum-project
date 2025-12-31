@@ -1,0 +1,384 @@
+package com.pgh.api_practice.service;
+
+import com.pgh.api_practice.dto.*;
+import com.pgh.api_practice.entity.*;
+import com.pgh.api_practice.exception.ApplicationUnauthorizedException;
+import com.pgh.api_practice.exception.ResourceNotFoundException;
+import com.pgh.api_practice.repository.*;
+import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+@AllArgsConstructor
+public class GroupService {
+
+    private final GroupRepository groupRepository;
+    private final GroupMemberRepository groupMemberRepository;
+    private final GroupChatRoomRepository groupChatRoomRepository;
+    private final GroupPostRepository groupPostRepository;
+    private final GroupChatMessageRepository groupChatMessageRepository;
+    private final UserRepository userRepository;
+
+    /** 현재 사용자 가져오기 */
+    private Users getCurrentUser() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || "anonymousUser".equals(authentication.getName())) {
+            return null;
+        }
+        return userRepository.findByUsername(authentication.getName()).orElse(null);
+    }
+
+    /** 모임 생성 */
+    @Transactional
+    public Long createGroup(CreateGroupDTO dto) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = Group.builder()
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .owner(currentUser)
+                .profileImageUrl(dto.getProfileImageUrl())
+                .build();
+
+        Group created = groupRepository.save(group);
+
+        // 모임 생성자를 관리자로 추가
+        GroupMember ownerMember = GroupMember.builder()
+                .group(created)
+                .user(currentUser)
+                .isAdmin(true)
+                .build();
+        groupMemberRepository.save(ownerMember);
+
+        // 기본 채팅방 생성 (관리자방, 일반방)
+        GroupChatRoom adminRoom = GroupChatRoom.builder()
+                .group(created)
+                .name("관리자방")
+                .description("모임 관리자 전용 채팅방입니다.")
+                .isAdminRoom(true)
+                .build();
+        groupChatRoomRepository.save(adminRoom);
+
+        GroupChatRoom generalRoom = GroupChatRoom.builder()
+                .group(created)
+                .name("일반방")
+                .description("모든 멤버가 사용할 수 있는 채팅방입니다.")
+                .isAdminRoom(false)
+                .build();
+        groupChatRoomRepository.save(generalRoom);
+
+        return created.getId();
+    }
+
+    /** 모임 목록 조회 */
+    @Transactional(readOnly = true)
+    public Page<GroupListDTO> getGroupList(Pageable pageable) {
+        Page<Group> groups = groupRepository.findByIsDeletedFalseOrderByCreatedTimeDesc(pageable);
+        Users currentUser = getCurrentUser();
+
+        List<GroupListDTO> groupList = groups.getContent().stream().map(group -> {
+            long memberCount = groupMemberRepository.countByGroupId(group.getId());
+            boolean isMember = false;
+            boolean isAdmin = false;
+
+            if (currentUser != null) {
+                Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(group.getId(), currentUser.getId());
+                if (member.isPresent()) {
+                    isMember = true;
+                    isAdmin = member.get().isAdmin();
+                }
+            }
+
+            return GroupListDTO.builder()
+                    .id(group.getId())
+                    .name(group.getName())
+                    .description(group.getDescription())
+                    .ownerUsername(group.getOwner().getUsername())
+                    .ownerNickname(group.getOwner().getNickname())
+                    .profileImageUrl(group.getProfileImageUrl())
+                    .memberCount(memberCount)
+                    .createdTime(group.getCreatedTime())
+                    .isMember(isMember)
+                    .isAdmin(isAdmin)
+                    .build();
+        }).collect(Collectors.toList());
+
+        return new PageImpl<>(groupList, pageable, groups.getTotalElements());
+    }
+
+    /** 모임 상세 조회 */
+    @Transactional(readOnly = true)
+    public GroupDetailDTO getGroupDetail(Long groupId) {
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        long memberCount = groupMemberRepository.countByGroupId(groupId);
+        Users currentUser = getCurrentUser();
+        boolean isMember = false;
+        boolean isAdmin = false;
+
+        if (currentUser != null) {
+            Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+            if (member.isPresent()) {
+                isMember = true;
+                isAdmin = member.get().isAdmin();
+            }
+        }
+
+        LocalDateTime updateTime = group.getUpdatedTime();
+        if (updateTime == null || updateTime.isBefore(group.getCreatedTime()) ||
+            updateTime.isBefore(LocalDateTime.of(1970, 1, 2, 0, 0))) {
+            updateTime = group.getCreatedTime();
+        }
+
+        return GroupDetailDTO.builder()
+                .id(group.getId())
+                .name(group.getName())
+                .description(group.getDescription())
+                .ownerUsername(group.getOwner().getUsername())
+                .ownerNickname(group.getOwner().getNickname())
+                .profileImageUrl(group.getProfileImageUrl())
+                .memberCount(memberCount)
+                .createdTime(group.getCreatedTime())
+                .updatedTime(updateTime)
+                .isMember(isMember)
+                .isAdmin(isAdmin)
+                .build();
+    }
+
+    /** 모임 가입 */
+    @Transactional
+    public void joinGroup(Long groupId) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, currentUser.getId())) {
+            throw new IllegalStateException("이미 가입한 모임입니다.");
+        }
+
+        GroupMember member = GroupMember.builder()
+                .group(group)
+                .user(currentUser)
+                .isAdmin(false)
+                .build();
+        groupMemberRepository.save(member);
+    }
+
+    /** 모임 탈퇴 */
+    @Transactional
+    public void leaveGroup(Long groupId) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        // 모임 주인은 탈퇴할 수 없음
+        if (group.getOwner().getId().equals(currentUser.getId())) {
+            throw new IllegalStateException("모임 주인은 탈퇴할 수 없습니다.");
+        }
+
+        groupMemberRepository.deleteByGroupIdAndUserId(groupId, currentUser.getId());
+    }
+
+    /** 모임 삭제 */
+    @Transactional
+    public void deleteGroup(Long groupId) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        // 모임 주인만 삭제 가능
+        if (!group.getOwner().getId().equals(currentUser.getId())) {
+            throw new ApplicationUnauthorizedException("모임 주인만 삭제할 수 있습니다.");
+        }
+
+        group.setDeleted(true);
+        groupRepository.save(group);
+    }
+
+    /** 채팅방 목록 조회 */
+    @Transactional(readOnly = true)
+    public List<GroupChatRoomDTO> getChatRooms(Long groupId) {
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        Users currentUser = getCurrentUser();
+        boolean isAdmin = false;
+
+        if (currentUser != null) {
+            Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+            if (member.isPresent()) {
+                isAdmin = member.get().isAdmin();
+            }
+        }
+
+        List<GroupChatRoom> rooms = groupChatRoomRepository.findByGroupIdAndIsDeletedFalseOrderByCreatedTimeAsc(groupId);
+        
+        // 관리자가 아니면 관리자방 제외
+        final boolean finalIsAdmin = isAdmin;
+        return rooms.stream()
+                .filter(room -> finalIsAdmin || !room.isAdminRoom())
+                .map(room -> GroupChatRoomDTO.builder()
+                        .id(room.getId())
+                        .name(room.getName())
+                        .description(room.getDescription())
+                        .isAdminRoom(room.isAdminRoom())
+                        .createdTime(room.getCreatedTime())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /** 채팅방 생성 */
+    @Transactional
+    public Long createChatRoom(Long groupId, CreateGroupChatRoomDTO dto) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        // 관리자만 채팅방 생성 가능
+        Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+        if (member.isEmpty() || !member.get().isAdmin()) {
+            throw new ApplicationUnauthorizedException("모임 관리자만 채팅방을 생성할 수 있습니다.");
+        }
+
+        GroupChatRoom room = GroupChatRoom.builder()
+                .group(group)
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .isAdminRoom(false)
+                .build();
+
+        GroupChatRoom created = groupChatRoomRepository.save(room);
+        return created.getId();
+    }
+
+    /** 채팅방 삭제 */
+    @Transactional
+    public void deleteChatRoom(Long groupId, Long roomId) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        GroupChatRoom room = groupChatRoomRepository.findByIdAndIsDeletedFalse(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("채팅방을 찾을 수 없습니다."));
+
+        // 관리자만 채팅방 삭제 가능
+        Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+        if (member.isEmpty() || !member.get().isAdmin()) {
+            throw new ApplicationUnauthorizedException("모임 관리자만 채팅방을 삭제할 수 있습니다.");
+        }
+
+        // 기본 채팅방은 삭제 불가
+        if (room.isAdminRoom() || "일반방".equals(room.getName())) {
+            throw new IllegalStateException("기본 채팅방은 삭제할 수 없습니다.");
+        }
+
+        room.setDeleted(true);
+        groupChatRoomRepository.save(room);
+    }
+
+    /** 채팅 메시지 전송 */
+    @Transactional
+    public Long sendChatMessage(Long groupId, Long roomId, CreateGroupChatMessageDTO dto) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        GroupChatRoom room = groupChatRoomRepository.findByIdAndIsDeletedFalse(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("채팅방을 찾을 수 없습니다."));
+
+        // 모임 멤버인지 확인
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, currentUser.getId())) {
+            throw new ApplicationUnauthorizedException("모임 멤버만 메시지를 전송할 수 있습니다.");
+        }
+
+        // 관리자방은 관리자만 접근 가능
+        if (room.isAdminRoom()) {
+            Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+            if (member.isEmpty() || !member.get().isAdmin()) {
+                throw new ApplicationUnauthorizedException("관리자만 관리자방에 메시지를 전송할 수 있습니다.");
+            }
+        }
+
+        GroupChatMessage message = GroupChatMessage.builder()
+                .chatRoom(room)
+                .user(currentUser)
+                .message(dto.getMessage())
+                .build();
+
+        GroupChatMessage created = groupChatMessageRepository.save(message);
+        return created.getId();
+    }
+
+    /** 채팅 메시지 목록 조회 */
+    @Transactional(readOnly = true)
+    public List<GroupChatMessageDTO> getChatMessages(Long groupId, Long roomId, int page, int size) {
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        GroupChatRoom room = groupChatRoomRepository.findByIdAndIsDeletedFalse(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("채팅방을 찾을 수 없습니다."));
+
+        Users currentUser = getCurrentUser();
+        
+        // 관리자방은 관리자만 접근 가능
+        if (room.isAdminRoom()) {
+            if (currentUser == null) {
+                throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+            }
+            Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+            if (member.isEmpty() || !member.get().isAdmin()) {
+                throw new ApplicationUnauthorizedException("관리자만 관리자방을 볼 수 있습니다.");
+            }
+        }
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        List<GroupChatMessage> messages = groupChatMessageRepository.findRecentMessages(roomId, pageable);
+
+        return messages.stream().map(msg -> GroupChatMessageDTO.builder()
+                .id(msg.getId())
+                .message(msg.getMessage())
+                .username(msg.getUser().getUsername())
+                .nickname(msg.getUser().getNickname())
+                .profileImageUrl(msg.getUser().getProfileImageUrl())
+                .createdTime(msg.getCreatedTime())
+                .build()).collect(Collectors.toList());
+    }
+}
