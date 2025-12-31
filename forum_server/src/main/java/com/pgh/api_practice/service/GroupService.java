@@ -316,6 +316,42 @@ public class GroupService {
         return memberDTOs;
     }
 
+    /** 멤버 관리자 권한 변경 */
+    @Transactional
+    public void updateMemberAdmin(Long groupId, Long userId, boolean isAdmin) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+
+        // 모임 주인만 권한 변경 가능
+        if (!group.getOwner().getId().equals(currentUser.getId())) {
+            throw new ApplicationUnauthorizedException("모임 주인만 멤버 권한을 변경할 수 있습니다.");
+        }
+
+        // 자신의 권한은 변경할 수 없음
+        if (currentUser.getId().equals(userId)) {
+            throw new IllegalArgumentException("자신의 권한은 변경할 수 없습니다.");
+        }
+
+        // 모임 주인의 권한은 변경할 수 없음
+        if (group.getOwner().getId().equals(userId)) {
+            throw new IllegalArgumentException("모임 주인의 권한은 변경할 수 없습니다.");
+        }
+
+        Optional<GroupMember> memberOpt = groupMemberRepository.findByGroupIdAndUserId(groupId, userId);
+        if (memberOpt.isEmpty()) {
+            throw new ResourceNotFoundException("멤버를 찾을 수 없습니다.");
+        }
+
+        GroupMember member = memberOpt.get();
+        member.setAdmin(isAdmin);
+        groupMemberRepository.save(member);
+    }
+
     /** 모임 삭제 */
     @Transactional
     public void deleteGroup(Long groupId) {

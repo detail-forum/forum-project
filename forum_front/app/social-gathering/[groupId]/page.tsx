@@ -129,6 +129,23 @@ export default function GroupDetailPage() {
     }
   }
 
+  const handleToggleAdmin = async (userId: number, currentIsAdmin: boolean) => {
+    if (!confirm(`정말로 이 멤버의 관리자 권한을 ${currentIsAdmin ? '해제' : '부여'}하시겠습니까?`)) {
+      return
+    }
+
+    try {
+      const response = await groupApi.updateMemberAdmin(groupId, userId, !currentIsAdmin)
+      if (response.success) {
+        await fetchMembers()
+        alert(`관리자 권한이 ${!currentIsAdmin ? '부여' : '해제'}되었습니다.`)
+      }
+    } catch (error: any) {
+      console.error('관리자 권한 변경 실패:', error)
+      alert(error.response?.data?.message || '관리자 권한 변경에 실패했습니다.')
+    }
+  }
+
   const handleJoin = async () => {
     if (!isAuthenticated) {
       setShowLoginModal(true)
@@ -499,6 +516,9 @@ export default function GroupDetailPage() {
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">사용자</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">역할</th>
+                        {group?.isAdmin && (
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">관리</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -553,6 +573,23 @@ export default function GroupDetailPage() {
                                 )}
                               </div>
                             </td>
+                            {group?.isAdmin && (
+                              <td className="px-4 py-3">
+                                {!member.isOwner && (
+                                  <button
+                                    onClick={() => handleToggleAdmin(member.userId, member.isAdmin)}
+                                    className={`px-3 py-1 text-xs rounded transition ${
+                                      member.isAdmin
+                                        ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                        : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                    }`}
+                                    title={member.isAdmin ? '관리자 권한 해제' : '관리자 권한 부여'}
+                                  >
+                                    {member.isAdmin ? '관리자 해제' : '관리자 부여'}
+                                  </button>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         ))}
                     </tbody>

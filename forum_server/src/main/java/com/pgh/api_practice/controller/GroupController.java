@@ -78,6 +78,17 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.ok(members, "모임 멤버 목록 조회 성공"));
     }
 
+    /** 멤버 관리자 권한 변경 */
+    @PatchMapping("/{groupId}/members/{userId}/admin")
+    public ResponseEntity<ApiResponse<Void>> updateMemberAdmin(
+            @PathVariable Long groupId,
+            @PathVariable Long userId,
+            @RequestParam boolean isAdmin) {
+        groupService.updateMemberAdmin(groupId, userId, isAdmin);
+        String message = isAdmin ? "관리자 권한이 부여되었습니다." : "관리자 권한이 해제되었습니다.";
+        return ResponseEntity.ok(ApiResponse.ok(message));
+    }
+
     /** 모임 삭제 */
     @DeleteMapping("/{groupId}")
     public ResponseEntity<ApiResponse<Void>> deleteGroup(@PathVariable Long groupId) {

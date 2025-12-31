@@ -389,6 +389,13 @@ export const groupApi = {
     return response.data
   },
 
+  updateMemberAdmin: async (groupId: number, userId: number, isAdmin: boolean): Promise<ApiResponse<void>> => {
+    const response = await apiClient.patch<ApiResponse<void>>(`/group/${groupId}/members/${userId}/admin`, null, {
+      params: { isAdmin },
+    })
+    return response.data
+  },
+
   checkMembership: async (groupId: number): Promise<ApiResponse<boolean>> => {
     const response = await apiClient.get<ApiResponse<boolean>>(`/group/${groupId}/membership`)
     return response.data
