@@ -41,6 +41,10 @@ export default function ChatRoomPage() {
   const [newRoomName, setNewRoomName] = useState('')
   const [newRoomDescription, setNewRoomDescription] = useState('')
   const [creatingRoom, setCreatingRoom] = useState(false)
+  const [newRoomImage, setNewRoomImage] = useState<string>('')
+  const [showNewRoomImageCrop, setShowNewRoomImageCrop] = useState(false)
+  const [deletingRoom, setDeletingRoom] = useState(false)
+  const newRoomImageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (groupId) {
@@ -227,6 +231,35 @@ export default function ChatRoomPage() {
     setShowCreateRoomModal(false)
     setNewRoomName('')
     setNewRoomDescription('')
+    setNewRoomImage('')
+  }
+
+  const handleNewRoomImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const imageSrc = event.target?.result as string
+        setNewRoomImage(imageSrc)
+        setShowNewRoomImageCrop(true)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleNewRoomImageCrop = async (croppedImageBlob: Blob) => {
+    try {
+      const file = new File([croppedImageBlob], 'profile.jpg', { type: 'image/jpeg' })
+      const uploadResponse = await imageUploadApi.uploadImage(file)
+      
+      if (uploadResponse.success && uploadResponse.data) {
+        setNewRoomImage(uploadResponse.data.url)
+        setShowNewRoomImageCrop(false)
+      }
+    } catch (error: any) {
+      console.error('이미지 업로드 실패:', error)
+      alert('이미지 업로드에 실패했습니다.')
+    }
   }
 
   const handleCreateRoom = async () => {
@@ -241,7 +274,11 @@ export default function ChatRoomPage() {
         name: newRoomName,
         description: newRoomDescription || undefined,
       })
-      if (response.success) {
+      if (response.success && response.data) {
+        // 이미지가 있으면 업데이트
+        if (newRoomImage) {
+          await groupApi.updateChatRoom(groupId, response.data, { profileImageUrl: newRoomImage })
+        }
         await fetchChatRooms()
         handleCloseCreateRoomModal()
         alert('채팅방이 생성되었습니다.')
@@ -251,6 +288,34 @@ export default function ChatRoomPage() {
       alert(error.response?.data?.message || '채팅방 생성에 실패했습니다.')
     } finally {
       setCreatingRoom(false)
+    }
+  }
+
+  const handleDeleteRoom = async () => {
+    if (!currentRoom) return
+    
+    if (!confirm(`정말로 "${currentRoom.name}" 채팅방을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      return
+    }
+
+    try {
+      setDeletingRoom(true)
+      await groupApi.deleteChatRoom(groupId, roomId)
+      await fetchChatRooms()
+      // 삭제 후 첫 번째 채팅방으로 이동
+      const remainingRooms = chatRooms.filter(room => room.id !== roomId)
+      if (remainingRooms.length > 0) {
+        router.push(`/social-gathering/${groupId}/chat/${remainingRooms[0].id}`)
+      } else {
+        router.push(`/social-gathering/${groupId}`)
+      }
+      alert('채팅방이 삭제되었습니다.')
+    } catch (error: any) {
+      console.error('채팅방 삭제 실패:', error)
+      alert(error.response?.data?.message || '채팅방 삭제에 실패했습니다.')
+    } finally {
+      setDeletingRoom(false)
+      setEditingRoom(false)
     }
   }
 
@@ -404,7 +469,7 @@ export default function ChatRoomPage() {
                           onChange={(e) => setEditRoomName(e.target.value)}
                           placeholder="채팅방 이름"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          disabled={updatingRoom}
+                          disabled={updatingRoom || deletingRoom}
                         />
                         <textarea
                           value={editRoomDescription}
@@ -412,48 +477,59 @@ export default function ChatRoomPage() {
                           placeholder="채팅방 설명 (선택사항)"
                           rows={2}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          disabled={updatingRoom}
+                          disabled={updatingRoom || deletingRoom}
                         />
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 justify-between">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleUpdateRoom}
+                              disabled={updatingRoom || deletingRoom || !editRoomName.trim() || editRoomName.length < 2}
+                              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {updatingRoom ? '저장 중...' : '저장'}
+                            </button>
+                            <button
+                              onClick={handleCancelEditRoom}
+                              disabled={updatingRoom || deletingRoom}
+                              className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm transition disabled:opacity-50"
+                            >
+                              취소
+                            </button>
+                          </div>
                           <button
-                            onClick={handleUpdateRoom}
-                            disabled={updatingRoom || !editRoomName.trim() || editRoomName.length < 2}
-                            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={handleDeleteRoom}
+                            disabled={updatingRoom || deletingRoom}
+                            className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {updatingRoom ? '저장 중...' : '저장'}
-                          </button>
-                          <button
-                            onClick={handleCancelEditRoom}
-                            disabled={updatingRoom}
-                            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm transition disabled:opacity-50"
-                          >
-                            취소
+                            {deletingRoom ? '삭제 중...' : '채팅방 삭제'}
                           </button>
                         </div>
                       </div>
                     ) : (
                       <>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-semibold text-gray-800">
-                            {currentRoom.name}
-                          </h3>
-                          {currentRoom.isAdminRoom && (
-                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                              관리자 전용
-                            </span>
-                          )}
-                          {group?.isAdmin && (
-                            <button
-                              onClick={handleStartEditRoom}
-                              className="text-gray-400 hover:text-gray-600 transition"
-                              title="채팅방 설정"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              </svg>
-                            </button>
-                          )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-gray-800">
+                              {currentRoom.name}
+                            </h3>
+                            {currentRoom.isAdminRoom && (
+                              <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                                관리자 전용
+                              </span>
+                            )}
+                            {group?.isAdmin && (
+                              <button
+                                onClick={handleStartEditRoom}
+                                className="text-gray-400 hover:text-gray-600 transition"
+                                title="채팅방 설정"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
                         </div>
                         {currentRoom.description && (
                           <p className="text-sm text-gray-500 mt-0.5">
@@ -600,7 +676,7 @@ export default function ChatRoomPage() {
       {/* 채팅방 생성 모달 */}
       {showCreateRoomModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4">새 채팅방 만들기</h2>
             <div className="space-y-4">
               <div>
@@ -630,6 +706,54 @@ export default function ChatRoomPage() {
                   disabled={creatingRoom}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  채팅방 프로필 이미지 (선택사항)
+                </label>
+                <div className="flex items-center gap-4">
+                  {newRoomImage ? (
+                    <div className="relative">
+                      <img
+                        src={newRoomImage}
+                        alt="프로필 미리보기"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewRoomImage('')
+                          if (newRoomImageInputRef.current) {
+                            newRoomImageInputRef.current.value = ''
+                          }
+                        }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition"
+                        title="이미지 제거"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
+                      <span className="text-gray-400 text-xs">이미지 없음</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => newRoomImageInputRef.current?.click()}
+                    disabled={creatingRoom}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm transition disabled:opacity-50"
+                  >
+                    {newRoomImage ? '이미지 변경' : '이미지 선택'}
+                  </button>
+                  <input
+                    ref={newRoomImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleNewRoomImageChange}
+                    className="hidden"
+                  />
+                </div>
+              </div>
             </div>
             <div className="flex gap-2 mt-6">
               <button
@@ -649,6 +773,23 @@ export default function ChatRoomPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 새 채팅방 이미지 크롭 모달 */}
+      {showNewRoomImageCrop && newRoomImage && (
+        <ImageCropModal
+          isOpen={showNewRoomImageCrop}
+          imageSrc={newRoomImage}
+          onClose={() => {
+            setShowNewRoomImageCrop(false)
+            setNewRoomImage('')
+            if (newRoomImageInputRef.current) {
+              newRoomImageInputRef.current.value = ''
+            }
+          }}
+          onCrop={handleNewRoomImageCrop}
+          aspectRatio={1}
+        />
       )}
     </div>
   )
