@@ -60,7 +60,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // 개발 환경과 프로덕션 환경 모두 지원
-        // localhost:3000 (개발), localhost:80 (Nginx), 실제 서버 도메인 허용
+        // allowedOriginPatterns 사용 (와일드카드 지원, allowCredentials와 호환)
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:3000",
             "http://localhost:80",
