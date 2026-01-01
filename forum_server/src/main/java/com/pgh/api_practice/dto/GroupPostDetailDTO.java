@@ -21,4 +21,5 @@ public class GroupPostDetailDTO {
     private boolean isAuthor;
     private boolean canEdit;
     private boolean canDelete;
+    private boolean isPublic;  // 모임 외부 노출 여부
 }

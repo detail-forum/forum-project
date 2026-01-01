@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store/store'
-import { groupApi } from '@/services/api'
-import type { GroupPostDetailDTO } from '@/types/api'
+import { groupApi, postApi } from '@/services/api'
+import type { GroupPostDetailDTO, PostDetailDTO } from '@/types/api'
 import Header from '@/components/Header'
+import CommentList from '@/components/CommentList'
 import LoginModal from '@/components/LoginModal'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -18,10 +19,14 @@ export default function GroupPostDetailPage() {
   const groupId = Number(params.groupId)
   const postId = Number(params.postId)
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
-  const [post, setPost] = useState<GroupPostDetailDTO | null>(null)
+  const [post, setPost] = useState<GroupPostDetailDTO | PostDetailDTO | null>(null)
+  const [isGroupPost, setIsGroupPost] = useState(false) // group_posts 테이블인지 posts 테이블인지 구분
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [liking, setLiking] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [isLiked, setIsLiked] = useState(false)
 
   useEffect(() => {
     if (groupId && postId) {
@@ -32,9 +37,42 @@ export default function GroupPostDetailPage() {
   const fetchPost = async () => {
     try {
       setLoading(true)
-      const response = await groupApi.getGroupPostDetail(groupId, postId)
-      if (response.success && response.data) {
-        setPost(response.data)
+      // 먼저 group_posts 테이블에서 조회 시도
+      try {
+        const groupPostResponse = await groupApi.getGroupPostDetail(groupId, postId)
+        if (groupPostResponse.success && groupPostResponse.data) {
+          setPost(groupPostResponse.data)
+          setIsGroupPost(true)
+          return
+        }
+      } catch (groupPostError) {
+        console.log('group_posts 테이블에서 조회 실패, posts 테이블에서 조회 시도:', groupPostError)
+      }
+      
+      // group_posts에서 찾지 못하면 posts 테이블에서 조회
+      const postResponse = await postApi.getPostDetail(postId)
+      if (postResponse.success && postResponse.data) {
+        // PostDetailDTO를 GroupPostDetailDTO 형식으로 변환
+        const postData = postResponse.data
+        const convertedPost: GroupPostDetailDTO = {
+          id: postData.id,
+          title: postData.title,
+          body: postData.body,
+          username: postData.username,
+          nickname: postData.nickname || postData.username,
+          Views: String(postData.views || 0),
+          createDateTime: postData.createDateTime,
+          updateDateTime: postData.updateDateTime,
+          profileImageUrl: postData.profileImageUrl,
+          canEdit: postData.canEdit,
+          canDelete: postData.canDelete,
+          isPublic: postData.isPublic,
+        }
+        setPost(convertedPost)
+        setIsGroupPost(false)
+        // 좋아요 정보 설정
+        setLikeCount(postData.likeCount || 0)
+        setIsLiked(postData.isLiked || false)
       }
     } catch (error) {
       console.error('게시물 조회 실패:', error)
@@ -43,14 +81,47 @@ export default function GroupPostDetailPage() {
     }
   }
 
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true)
+      return
+    }
+
+    try {
+      setLiking(true)
+      const response = await postApi.toggleLike(postId)
+      if (response.success) {
+        // 좋아요 상태 업데이트
+        const newIsLiked = response.data || false
+        const newLikeCount = newIsLiked ? likeCount + 1 : likeCount - 1
+        setIsLiked(newIsLiked)
+        setLikeCount(newLikeCount)
+      }
+    } catch (error: any) {
+      console.error('좋아요 처리 실패:', error)
+      alert(error.response?.data?.message || '좋아요 처리에 실패했습니다.')
+    } finally {
+      setLiking(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!confirm('정말 삭제하시겠습니까?')) return
 
     try {
       setDeleting(true)
-      const response = await groupApi.deleteGroupPost(groupId, postId)
-      if (response.success) {
-        router.push(`/social-gathering/${groupId}`)
+      if (isGroupPost) {
+        // group_posts 테이블의 게시글 삭제
+        const response = await groupApi.deleteGroupPost(groupId, postId)
+        if (response.success) {
+          router.push(`/social-gathering/${groupId}`)
+        }
+      } else {
+        // posts 테이블의 게시글 삭제
+        const response = await postApi.deletePost(postId)
+        if (response.success) {
+          router.push(`/social-gathering/${groupId}`)
+        }
       }
     } catch (error: any) {
       console.error('게시물 삭제 실패:', error)
@@ -286,6 +357,33 @@ export default function GroupPostDetailPage() {
                   {post.nickname} ({post.username})
                 </Link>
                 <span>조회수: {post.Views || 0}</span>
+                {/* posts 테이블의 게시글만 좋아요 기능 표시 */}
+                {!isGroupPost && (
+                  <button
+                    onClick={handleLike}
+                    disabled={liking}
+                    className={`flex items-center gap-1 px-3 py-1 rounded transition ${
+                      isLiked
+                        ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                        : 'text-gray-500 bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    <svg
+                      className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`}
+                      fill={isLiked ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                      />
+                    </svg>
+                    <span>{likeCount}</span>
+                  </button>
+                )}
               </div>
               <div>
                 <span>작성일: {formatDate(post.createDateTime)}</span>
@@ -310,11 +408,22 @@ export default function GroupPostDetailPage() {
             {renderMarkdown(post.body)}
           </div>
 
+          {/* 댓글 섹션 */}
+          <div className="mt-8 pt-8 border-t">
+            <CommentList postId={postId} />
+          </div>
+
           {(post.canEdit || post.canDelete) && (
             <div className="flex gap-2 pt-4 border-t">
               {post.canEdit && (
                 <button
-                  onClick={() => router.push(`/social-gathering/${groupId}/posts/${postId}/edit`)}
+                  onClick={() => {
+                    if (isGroupPost) {
+                      router.push(`/social-gathering/${groupId}/posts/${postId}/edit`)
+                    } else {
+                      router.push(`/posts/${postId}/edit`)
+                    }
+                  }}
                   className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
                 >
                   수정

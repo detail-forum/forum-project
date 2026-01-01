@@ -44,6 +44,10 @@ public class GroupPost {
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 
+    @Builder.Default
+    @Column(name = "is_public", nullable = false)
+    private boolean isPublic = true;  // 모임 외부 노출 여부 (기본값: true)
+
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
@@ -61,5 +65,10 @@ public class GroupPost {
 
     public boolean isDeleted() {
         return this.isDeleted;
+    }
+
+    // Lombok이 boolean 필드에 대해 setPublic 대신 setIsPublic을 생성할 수 있으므로 수동으로 추가
+    public void setPublic(boolean isPublic) {
+        this.isPublic = isPublic;
     }
 }

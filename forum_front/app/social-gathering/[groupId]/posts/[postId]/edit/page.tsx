@@ -21,6 +21,7 @@ export default function EditGroupPostPage() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [profileImageUrl, setProfileImageUrl] = useState<string | undefined>(undefined)
+  const [isPublic, setIsPublic] = useState(true)
   const [showImageCrop, setShowImageCrop] = useState(false)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
@@ -44,6 +45,7 @@ export default function EditGroupPostPage() {
         setTitle(response.data.title)
         setBody(response.data.body)
         setProfileImageUrl(response.data.profileImageUrl)
+        setIsPublic(response.data.isPublic ?? true)
       }
     } catch (error) {
       console.error('게시물 조회 실패:', error)
@@ -108,6 +110,7 @@ export default function EditGroupPostPage() {
         title,
         body,
         profileImageUrl,
+        isPublic,
       })
 
       if (response.success) {
@@ -219,6 +222,20 @@ export default function EditGroupPostPage() {
                 />
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                외부 게시물로 공개 (모임 외부에서도 볼 수 있게 함)
+              </span>
+            </label>
           </div>
 
           <div className="flex gap-4">

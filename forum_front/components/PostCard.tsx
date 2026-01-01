@@ -59,9 +59,17 @@ function PostCard({ post }: PostCardProps) {
     router.push(`/posts-list?tag=${encodeURIComponent(tag)}`)
   }
 
+  // 모임 게시글인 경우 모임 게시글 상세 페이지로, 아니면 일반 게시글 상세 페이지로
+  const getPostUrl = () => {
+    if (post.groupId) {
+      return `/social-gathering/${post.groupId}/posts/${post.id}`
+    }
+    return `/posts/${post.id}`
+  }
+
   return (
     <Link
-      href={`/posts/${post.id}`}
+      href={getPostUrl()}
       prefetch={true}
       className="block bg-white border border-gray-200 rounded-lg hover:border-primary hover:shadow-lg transition-all overflow-hidden h-full flex flex-col"
     >

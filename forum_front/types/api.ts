@@ -206,12 +206,14 @@ export interface GroupPostDetailDTO {
   isAuthor: boolean
   canEdit: boolean
   canDelete: boolean
+  isPublic?: boolean  // 모임 외부 노출 여부
 }
 
 export interface CreateGroupPostDTO {
   title: string
   body: string
   profileImageUrl?: string
+  isPublic?: boolean  // 모임 외부 노출 여부
 }
 
 export interface GroupChatRoomDTO {

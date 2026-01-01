@@ -14,4 +14,6 @@ public class CreateGroupPostDTO {
     private String body;
     
     private String profileImageUrl;
+    
+    private Boolean isPublic;  // 모임 외부 노출 여부
 }

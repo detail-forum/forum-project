@@ -58,6 +58,7 @@ public class GroupPostService {
                 .body(dto.getBody())
                 .user(currentUser)
                 .profileImageUrl(dto.getProfileImageUrl())
+                .isPublic(dto.getIsPublic() != null ? dto.getIsPublic() : true)  // 기본값 true
                 .build();
 
         GroupPost created = groupPostRepository.save(post);
@@ -141,6 +142,7 @@ public class GroupPostService {
                 .isAuthor(isAuthor)
                 .canEdit(canEdit)
                 .canDelete(canDelete)
+                .isPublic(post.isPublic())
                 .build();
     }
 
@@ -167,6 +169,9 @@ public class GroupPostService {
         post.setBody(dto.getBody());
         if (dto.getProfileImageUrl() != null) {
             post.setProfileImageUrl(dto.getProfileImageUrl());
+        }
+        if (dto.getIsPublic() != null) {
+            post.setPublic(dto.getIsPublic());
         }
         groupPostRepository.save(post);
     }
