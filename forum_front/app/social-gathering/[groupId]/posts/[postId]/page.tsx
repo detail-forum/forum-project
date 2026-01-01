@@ -410,7 +410,7 @@ export default function GroupPostDetailPage() {
                       {post.username}
                     </Link>
                     <span className="text-gray-400">•</span>
-                    <span>조회수: {post.Views || post.views || '0'}</span>
+                    <span>조회수: {post.Views || '0'}</span>
                     <span className="flex items-center space-x-1">
                       <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
