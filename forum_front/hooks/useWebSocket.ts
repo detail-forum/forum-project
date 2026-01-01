@@ -71,8 +71,6 @@ export function useWebSocket({
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
-      forceBinaryWS: false,
-      appendMissingNULL: false,
       debug: (str) => {
         // 개발 환경에서만 디버그 로그 출력
         if (process.env.NODE_ENV === 'development') {
