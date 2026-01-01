@@ -22,6 +22,7 @@ export default function GroupPostDetailPage() {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
   const [post, setPost] = useState<GroupPostDetailDTO | PostDetailDTO | null>(null)
   const [isGroupPost, setIsGroupPost] = useState(false) // group_posts 테이블인지 posts 테이블인지 구분
+  const [groupName, setGroupName] = useState<string>('') // 모임 이름
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -38,12 +39,25 @@ export default function GroupPostDetailPage() {
   const fetchPost = async () => {
     try {
       setLoading(true)
+      // 모임 정보 조회
+      try {
+        const groupResponse = await groupApi.getGroupDetail(groupId)
+        if (groupResponse.success && groupResponse.data) {
+          setGroupName(groupResponse.data.name)
+        }
+      } catch (error) {
+        console.error('모임 정보 조회 실패:', error)
+      }
+      
       // 먼저 group_posts 테이블에서 조회 시도
       try {
         const groupPostResponse = await groupApi.getGroupPostDetail(groupId, postId)
         if (groupPostResponse.success && groupPostResponse.data) {
           setPost(groupPostResponse.data)
           setIsGroupPost(true)
+          // 좋아요 정보 설정 (백엔드에서 GroupPostDetailDTO에 포함)
+          setLikeCount(groupPostResponse.data.likeCount || 0)
+          setIsLiked(groupPostResponse.data.isLiked || false)
           return
         }
       } catch (groupPostError) {
@@ -77,6 +91,10 @@ export default function GroupPostDetailPage() {
         // 좋아요 정보 설정
         setLikeCount(postData.likeCount || 0)
         setIsLiked(postData.isLiked || false)
+        // 모임 이름 설정 (postData에서 가져오거나 groupId로 조회)
+        if (postData.groupName) {
+          setGroupName(postData.groupName)
+        }
       }
     } catch (error) {
       console.error('게시물 조회 실패:', error)
@@ -336,44 +354,104 @@ export default function GroupPostDetailPage() {
     }
   }
 
-  return (
-    <div>
-      <Header onLoginClick={() => setShowLoginModal(true)} />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-4">
-          <button
-            onClick={() => router.push(`/social-gathering/${groupId}`)}
-            className="text-blue-500 hover:text-blue-600"
-          >
-            ← 모임으로 돌아가기
-          </button>
-        </div>
+  const hasValidUpdateDate = () => {
+    if (!post || !post.updateDateTime) return false
+    try {
+      const updateDate = new Date(post.updateDateTime)
+      const createDate = new Date(post.createDateTime)
+      const minValidDate = new Date('1970-01-02T00:00:00Z').getTime()
+      if (isNaN(updateDate.getTime()) || updateDate.getTime() < minValidDate) {
+        return false
+      }
+      return updateDate.getTime() > createDate.getTime()
+    } catch {
+      return false
+    }
+  }
 
-        <article className="bg-white rounded-lg shadow p-8">
-          <header className="mb-6">
-            <h1 className="text-3xl font-bold mb-4">{post.title}</h1>
-            <div className="flex justify-between items-center text-sm text-gray-500">
-              <div className="flex items-center gap-4">
-                <Link
-                  href={`/users/${post.username}`}
-                  className="hover:text-blue-500 transition"
+  const currentUsername = getUsernameFromToken()
+  const isOwner = isAuthenticated && post && currentUsername === post.username
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Header onLoginClick={() => setShowLoginModal(true)} />
+      {showLoginModal && (
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
+        />
+      )}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {loading ? (
+          <div className="text-center text-gray-500">로딩 중...</div>
+        ) : post ? (
+          <>
+            <article className="bg-white">
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                {post.title}
+                {groupName && (
+                  <span className="ml-3 text-lg font-normal">
+                    <Link
+                      href={`/social-gathering/${groupId}`}
+                      className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200 transition"
+                    >
+                      {groupName}
+                    </Link>
+                  </span>
+                )}
+              </h1>
+              <div className="flex items-center justify-between text-sm text-gray-500 mb-8 pb-4 border-b">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Link
+                      href={`/users/${post.username}`}
+                      className="font-medium text-gray-700 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      {post.username}
+                    </Link>
+                    <span className="text-gray-400">•</span>
+                    <span>조회수: {post.Views || post.views || '0'}</span>
+                    <span className="flex items-center space-x-1">
+                      <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      <span>좋아요: {likeCount || 0}</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span>작성일: {formatDate(post.createDateTime)}</span>
+                  {hasValidUpdateDate() && (
+                    <span className="text-xs">수정일: {formatDate(post.updateDateTime)}</span>
+                  )}
+                </div>
+              </div>
+              <div className="prose max-w-none">
+                <div className="text-gray-800 leading-relaxed">
+                  {renderMarkdown(post.body)}
+                </div>
+              </div>
+              
+              <div className="mt-8 pt-8 border-t flex justify-between items-center">
+                <button
+                  onClick={() => router.push(`/social-gathering/${groupId}`)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {post.nickname} ({post.username})
-                </Link>
-                <span>조회수: {post.Views || 0}</span>
-                {/* posts 테이블의 게시글만 좋아요 기능 표시 */}
-                {!isGroupPost && (
+                  목록으로
+                </button>
+                <div className="flex items-center space-x-4">
+                  {/* 좋아요 버튼 - 모든 게시글에 표시 */}
                   <button
                     onClick={handleLike}
-                    disabled={liking}
-                    className={`flex items-center gap-1 px-3 py-1 rounded transition ${
+                    disabled={liking || !isAuthenticated}
+                    className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
                       isLiked
-                        ? 'text-red-500 bg-red-50 hover:bg-red-100'
-                        : 'text-gray-500 bg-gray-50 hover:bg-gray-100'
-                    }`}
+                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <svg
-                      className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`}
+                      className="w-5 h-5"
                       fill={isLiked ? 'currentColor' : 'none'}
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -385,66 +463,45 @@ export default function GroupPostDetailPage() {
                         d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                       />
                     </svg>
-                    <span>{likeCount}</span>
+                    <span>{likeCount || 0}</span>
                   </button>
-                )}
+                  {isOwner && (
+                    <div className="flex space-x-2">
+                      {post.canEdit && (
+                        <button
+                          onClick={() => {
+                            if (isGroupPost) {
+                              router.push(`/social-gathering/${groupId}/posts/${postId}/edit`)
+                            } else {
+                              router.push(`/posts/${postId}/edit`)
+                            }
+                          }}
+                          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors"
+                        >
+                          수정
+                        </button>
+                      )}
+                      {post.canDelete && (
+                        <button
+                          onClick={handleDelete}
+                          disabled={deleting}
+                          className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deleting ? '삭제 중...' : '삭제'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <span>작성일: {formatDate(post.createDateTime)}</span>
-                {post.updateDateTime && post.updateDateTime !== post.createDateTime && (
-                  <span className="ml-2">수정일: {formatDate(post.updateDateTime)}</span>
-                )}
-              </div>
-            </div>
-          </header>
+            </article>
 
-          {post.profileImageUrl && (
-            <div className="mb-6">
-              <img
-                src={post.profileImageUrl}
-                alt={post.title}
-                className="w-full h-auto rounded-lg"
-              />
-            </div>
-          )}
-
-          <div className="prose max-w-none mb-8">
-            {renderMarkdown(post.body)}
-          </div>
-
-          {/* 댓글 섹션 */}
-          <div className="mt-8 pt-8 border-t">
-            <CommentList postId={postId} />
-          </div>
-
-          {(post.canEdit || post.canDelete) && (
-            <div className="flex gap-2 pt-4 border-t">
-              {post.canEdit && (
-                <button
-                  onClick={() => {
-                    if (isGroupPost) {
-                      router.push(`/social-gathering/${groupId}/posts/${postId}/edit`)
-                    } else {
-                      router.push(`/posts/${postId}/edit`)
-                    }
-                  }}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
-                >
-                  수정
-                </button>
-              )}
-              {post.canDelete && (
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition disabled:opacity-50"
-                >
-                  {deleting ? '삭제 중...' : '삭제'}
-                </button>
-              )}
-            </div>
-          )}
-        </article>
+            {/* 댓글 섹션 */}
+            <CommentList postId={postId} postAuthorUsername={post.username} />
+          </>
+        ) : (
+          <div className="text-center text-gray-500">게시글을 찾을 수 없습니다.</div>
+        )}
       </div>
 
       {showLoginModal && (

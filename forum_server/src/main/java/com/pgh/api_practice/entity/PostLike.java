@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "post_likes", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"post_id", "user_id"})
+    @UniqueConstraint(columnNames = {"post_id", "user_id"}),
+    @UniqueConstraint(columnNames = {"group_post_id", "user_id"})
 })
 @Getter
 @Setter
@@ -24,8 +25,12 @@ public class PostLike {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    private Post post;
+    @JoinColumn(name = "post_id")
+    private Post post;  // 일반 게시글 (nullable)
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_post_id")
+    private GroupPost groupPost;  // 모임 게시글 (nullable)
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

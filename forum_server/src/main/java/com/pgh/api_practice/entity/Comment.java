@@ -26,8 +26,12 @@ public class Comment {
     private String body;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    private Post post;
+    @JoinColumn(name = "post_id")
+    private Post post;  // 일반 게시글 (nullable)
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_post_id")
+    private GroupPost groupPost;  // 모임 게시글 (nullable)
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

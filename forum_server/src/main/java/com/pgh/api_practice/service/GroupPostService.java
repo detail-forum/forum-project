@@ -26,6 +26,7 @@ public class GroupPostService {
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
+    private final PostLikeRepository postLikeRepository;
 
     /** 현재 사용자 가져오기 */
     private Users getCurrentUser() {
@@ -129,6 +130,15 @@ public class GroupPostService {
             updateTime = post.getCreatedTime();
         }
 
+        // 좋아요 수 조회
+        long likeCount = postLikeRepository.countByGroupPostId(post.getId());
+        
+        // 현재 사용자가 좋아요를 눌렀는지 확인
+        boolean isLiked = false;
+        if (currentUser != null) {
+            isLiked = postLikeRepository.existsByGroupPostIdAndUserId(post.getId(), currentUser.getId());
+        }
+
         return GroupPostDetailDTO.builder()
                 .id(post.getId())
                 .title(post.getTitle())
@@ -143,6 +153,8 @@ public class GroupPostService {
                 .canEdit(canEdit)
                 .canDelete(canDelete)
                 .isPublic(post.isPublic())
+                .likeCount(likeCount)
+                .isLiked(isLiked)
                 .build();
     }
 

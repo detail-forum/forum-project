@@ -415,14 +415,32 @@ public class PostService {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("유저를 찾을 수 없습니다."));
         
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new ResourceNotFoundException("게시글을 찾을 수 없습니다."));
+        // 먼저 posts 테이블에서 찾기
+        Post post = null;
+        GroupPost groupPost = null;
         
-        if (post.isDeleted()) {
-            throw new ResourceNotFoundException("삭제된 게시글입니다.");
+        Optional<Post> postOpt = postRepository.findById(postId);
+        if (postOpt.isPresent()) {
+            post = postOpt.get();
+            if (post.isDeleted()) {
+                throw new ResourceNotFoundException("삭제된 게시글입니다.");
+            }
+        } else {
+            // posts에서 찾지 못하면 group_posts에서 찾기
+            Optional<GroupPost> groupPostOpt = groupPostRepository.findByIdAndIsDeletedFalse(postId);
+            if (groupPostOpt.isPresent()) {
+                groupPost = groupPostOpt.get();
+            } else {
+                throw new ResourceNotFoundException("게시글을 찾을 수 없습니다.");
+            }
         }
         
-        Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, user.getId());
+        Optional<PostLike> existingLike;
+        if (post != null) {
+            existingLike = postLikeRepository.findByPostIdAndUserId(postId, user.getId());
+        } else {
+            existingLike = postLikeRepository.findByGroupPostIdAndUserId(postId, user.getId());
+        }
         
         if (existingLike.isPresent()) {
             // 좋아요 취소
@@ -430,11 +448,14 @@ public class PostService {
             return false; // 좋아요 취소됨
         } else {
             // 좋아요 추가
-            PostLike like = PostLike.builder()
-                    .post(post)
-                    .user(user)
-                    .build();
-            postLikeRepository.save(like);
+            PostLike.PostLikeBuilder likeBuilder = PostLike.builder()
+                    .user(user);
+            if (post != null) {
+                likeBuilder.post(post);
+            } else {
+                likeBuilder.groupPost(groupPost);
+            }
+            postLikeRepository.save(likeBuilder.build());
             return true; // 좋아요 추가됨
         }
     }
@@ -723,7 +744,9 @@ public class PostService {
                 updateTime = groupPost.getCreatedTime();
             }
             
-            // GroupPost는 PostLike와 연결되어 있지 않으므로 likeCount는 0
+            // GroupPost의 좋아요 수 조회
+            long likeCount = postLikeRepository.countByGroupPostId(groupPost.getId());
+            
             PostListDTO dto = PostListDTO.builder()
                     .id(groupPost.getId())
                     .title(groupPost.getTitle())
@@ -732,11 +755,11 @@ public class PostService {
                     .createDateTime(groupPost.getCreatedTime())
                     .updateDateTime(updateTime)
                     .profileImageUrl(groupPost.getProfileImageUrl())
-                    .likeCount(0) // GroupPost는 좋아요 기능이 없을 수 있음
+                    .likeCount(likeCount)
                     .tags(new ArrayList<>()) // GroupPost는 태그가 없을 수 있음
                     .groupId(groupPost.getGroup().getId())
                     .groupName(groupPost.getGroup().getName())
-                    .isPublic(true) // group_posts는 항상 모임 내부 게시글이므로 기본값 true
+                    .isPublic(groupPost.isPublic())
                     .build();
             
             allPosts.add(dto);

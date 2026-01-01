@@ -211,6 +211,8 @@ export interface GroupPostDetailDTO {
   canEdit: boolean
   canDelete: boolean
   isPublic?: boolean  // 모임 외부 노출 여부
+  likeCount?: number  // 좋아요 수
+  isLiked?: boolean  // 현재 사용자가 좋아요를 눌렀는지 여부
 }
 
 export interface CreateGroupPostDTO {

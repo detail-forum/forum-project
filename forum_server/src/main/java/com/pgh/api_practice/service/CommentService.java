@@ -5,12 +5,14 @@ import com.pgh.api_practice.dto.CreateCommentDTO;
 import com.pgh.api_practice.dto.UpdateCommentDTO;
 import com.pgh.api_practice.entity.Comment;
 import com.pgh.api_practice.entity.CommentLike;
+import com.pgh.api_practice.entity.GroupPost;
 import com.pgh.api_practice.entity.Post;
 import com.pgh.api_practice.entity.Users;
 import com.pgh.api_practice.exception.ApplicationUnauthorizedException;
 import com.pgh.api_practice.exception.ResourceNotFoundException;
 import com.pgh.api_practice.repository.CommentLikeRepository;
 import com.pgh.api_practice.repository.CommentRepository;
+import com.pgh.api_practice.repository.GroupPostRepository;
 import com.pgh.api_practice.repository.PostRepository;
 import com.pgh.api_practice.repository.UserRepository;
 import lombok.AllArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,6 +31,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final CommentLikeRepository commentLikeRepository;
     private final PostRepository postRepository;
+    private final GroupPostRepository groupPostRepository;
     private final UserRepository userRepository;
 
     /**
@@ -55,15 +59,15 @@ public class CommentService {
     }
 
     /**
-     * 댓글 목록 조회 (대댓글 포함)
+     * 댓글 목록 조회 (대댓글 포함) - posts와 group_posts 모두 지원
      */
     @Transactional(readOnly = true)
     public List<CommentDTO> getCommentsByPostId(Long postId) {
         // 인증되지 않은 사용자도 댓글을 볼 수 있음
         Users currentUser = getCurrentUserOrNull();
 
-        // 최상위 댓글 목록 조회
-        List<Comment> topLevelComments = commentRepository.findAllByPostIdAndNotDeletedAndNoParent(postId);
+        // 최상위 댓글 목록 조회 (posts와 group_posts 모두)
+        List<Comment> topLevelComments = commentRepository.findAllByPostIdOrGroupPostIdAndNotDeletedAndNoParent(postId);
 
         // effectively final로 만들기 위해 final 변수에 복사
         final Users finalCurrentUser = currentUser;
@@ -85,12 +89,16 @@ public class CommentService {
                 .map(reply -> convertToDTO(reply, currentUser))
                 .collect(Collectors.toList());
 
+        // postId 결정 (post 또는 groupPost 중 하나)
+        Long postIdValue = comment.getPost() != null ? comment.getPost().getId() : 
+                           (comment.getGroupPost() != null ? comment.getGroupPost().getId() : null);
+        
         return CommentDTO.builder()
                 .id(comment.getId())
                 .body(comment.getBody())
                 .username(comment.getUser().getUsername())
                 .userId(comment.getUser().getId())
-                .postId(comment.getPost().getId())
+                .postId(postIdValue)
                 .parentCommentId(comment.getParentComment() != null ? comment.getParentComment().getId() : null)
                 .isPinned(comment.isPinned())
                 .likeCount(likeCount)
@@ -102,17 +110,30 @@ public class CommentService {
     }
 
     /**
-     * 댓글 생성
+     * 댓글 생성 - posts와 group_posts 모두 지원
      */
     @Transactional
     public CommentDTO createComment(CreateCommentDTO dto) {
         Users currentUser = getCurrentUser();
 
-        Post post = postRepository.findById(dto.getPostId())
-                .orElseThrow(() -> new ResourceNotFoundException("게시글을 찾을 수 없습니다."));
-
-        if (post.isDeleted()) {
-            throw new ResourceNotFoundException("삭제된 게시글입니다.");
+        // 먼저 posts 테이블에서 찾기
+        Post post = null;
+        GroupPost groupPost = null;
+        
+        Optional<Post> postOpt = postRepository.findById(dto.getPostId());
+        if (postOpt.isPresent()) {
+            post = postOpt.get();
+            if (post.isDeleted()) {
+                throw new ResourceNotFoundException("삭제된 게시글입니다.");
+            }
+        } else {
+            // posts에서 찾지 못하면 group_posts에서 찾기
+            Optional<GroupPost> groupPostOpt = groupPostRepository.findByIdAndIsDeletedFalse(dto.getPostId());
+            if (groupPostOpt.isPresent()) {
+                groupPost = groupPostOpt.get();
+            } else {
+                throw new ResourceNotFoundException("게시글을 찾을 수 없습니다.");
+            }
         }
 
         Comment parentComment = null;
@@ -123,19 +144,25 @@ public class CommentService {
                 throw new ResourceNotFoundException("삭제된 댓글입니다.");
             }
             // 대댓글은 같은 게시글에만 작성 가능
-            if (!parentComment.getPost().getId().equals(post.getId())) {
+            Long parentPostId = parentComment.getPost() != null ? parentComment.getPost().getId() :
+                               (parentComment.getGroupPost() != null ? parentComment.getGroupPost().getId() : null);
+            if (parentPostId == null || !parentPostId.equals(dto.getPostId())) {
                 throw new ApplicationUnauthorizedException("같은 게시글에만 대댓글을 작성할 수 있습니다.");
             }
         }
 
-        Comment comment = Comment.builder()
+        Comment.CommentBuilder commentBuilder = Comment.builder()
                 .body(dto.getBody())
-                .post(post)
                 .user(currentUser)
-                .parentComment(parentComment)
-                .build();
+                .parentComment(parentComment);
+        
+        if (post != null) {
+            commentBuilder.post(post);
+        } else {
+            commentBuilder.groupPost(groupPost);
+        }
 
-        Comment saved = commentRepository.save(comment);
+        Comment saved = commentRepository.save(commentBuilder.build());
         return convertToDTO(saved, currentUser);
     }
 
@@ -179,7 +206,12 @@ public class CommentService {
 
         // 작성자 또는 게시글 작성자만 삭제 가능
         boolean isCommentAuthor = comment.getUser().getId().equals(currentUser.getId());
-        boolean isPostAuthor = comment.getPost().getUser().getId().equals(currentUser.getId());
+        boolean isPostAuthor = false;
+        if (comment.getPost() != null) {
+            isPostAuthor = comment.getPost().getUser().getId().equals(currentUser.getId());
+        } else if (comment.getGroupPost() != null) {
+            isPostAuthor = comment.getGroupPost().getUser().getId().equals(currentUser.getId());
+        }
 
         if (!isCommentAuthor && !isPostAuthor) {
             throw new ApplicationUnauthorizedException("작성자 또는 게시글 작성자만 댓글을 삭제할 수 있습니다.");
@@ -236,7 +268,14 @@ public class CommentService {
         }
 
         // 게시글 작성자만 댓글을 고정할 수 있음
-        if (!comment.getPost().getUser().getId().equals(currentUser.getId())) {
+        boolean isPostAuthor = false;
+        if (comment.getPost() != null) {
+            isPostAuthor = comment.getPost().getUser().getId().equals(currentUser.getId());
+        } else if (comment.getGroupPost() != null) {
+            isPostAuthor = comment.getGroupPost().getUser().getId().equals(currentUser.getId());
+        }
+        
+        if (!isPostAuthor) {
             throw new ApplicationUnauthorizedException("게시글 작성자만 댓글을 고정할 수 있습니다.");
         }
 
