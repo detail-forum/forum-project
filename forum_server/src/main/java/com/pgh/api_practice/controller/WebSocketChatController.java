@@ -47,11 +47,26 @@ public class WebSocketChatController {
                 return;
             }
 
-            log.info("메시지 저장 시작: groupId={}, roomId={}, username={}, message={}", 
-                    groupId, roomId, principal.getName(), message);
+            // 답장 정보 추출
+            Long replyToMessageId = null;
+            Object replyToIdObj = payload.get("replyToMessageId");
+            if (replyToIdObj != null) {
+                if (replyToIdObj instanceof Number) {
+                    replyToMessageId = ((Number) replyToIdObj).longValue();
+                } else {
+                    try {
+                        replyToMessageId = Long.parseLong(replyToIdObj.toString());
+                    } catch (NumberFormatException e) {
+                        log.warn("답장 메시지 ID 파싱 실패: {}", replyToIdObj);
+                    }
+                }
+            }
+
+            log.info("메시지 저장 시작: groupId={}, roomId={}, username={}, message={}, replyToMessageId={}", 
+                    groupId, roomId, principal.getName(), message, replyToMessageId);
             
             // 메시지 저장 및 DTO 생성 (Principal의 username 전달)
-            GroupChatMessageDTO messageDTO = chatService.saveAndGetMessage(groupId, roomId, message, principal.getName());
+            GroupChatMessageDTO messageDTO = chatService.saveAndGetMessage(groupId, roomId, message, principal.getName(), replyToMessageId);
             
             log.info("메시지 저장 완료: messageId={}, username={}", messageDTO.getId(), messageDTO.getUsername());
             

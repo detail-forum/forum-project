@@ -228,7 +228,7 @@ export function useWebSocket({
     }
   }, [groupId, roomId, enabled, getToken]) // 콜백 함수 의존성 제거
 
-  const sendMessage = useCallback((message: string) => {
+  const sendMessage = useCallback((message: string, replyToMessageId?: number) => {
     if (!clientRef.current) {
       console.error('WebSocket 클라이언트가 없습니다.')
       return false
@@ -241,7 +241,11 @@ export function useWebSocket({
     
     try {
       const destination = `/app/chat/${groupId}/${roomId}/send`
-      const body = JSON.stringify({ message })
+      const payload: any = { message }
+      if (replyToMessageId) {
+        payload.replyToMessageId = replyToMessageId
+      }
+      const body = JSON.stringify(payload)
       console.log('메시지 전송:', { destination, body, connected: clientRef.current.connected })
       
       clientRef.current.publish({

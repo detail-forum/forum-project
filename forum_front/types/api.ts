@@ -267,4 +267,5 @@ export interface GroupChatMessageDTO {
 
 export interface CreateGroupChatMessageDTO {
   message: string
+  replyToMessageId?: number  // 답장한 메시지 ID
 }

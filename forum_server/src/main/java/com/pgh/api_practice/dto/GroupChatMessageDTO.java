@@ -22,4 +22,21 @@ public class GroupChatMessageDTO {
     
     private LocalDateTime createdTime;
     private int readCount;
+    
+    private Long replyToMessageId;  // 답장한 메시지 ID
+    private ReplyToMessageInfo replyToMessage;  // 답장한 메시지 정보
+    
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Builder
+    public static class ReplyToMessageInfo {
+        private Long id;
+        private String message;
+        private String username;
+        private String nickname;
+        private String displayName;
+        private String profileImageUrl;
+    }
 }

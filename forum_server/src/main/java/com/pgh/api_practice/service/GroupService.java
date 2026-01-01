@@ -619,10 +619,22 @@ public class GroupService {
             }
         }
 
+        // 답장할 메시지 조회
+        GroupChatMessage replyToMessage = null;
+        if (dto.getReplyToMessageId() != null) {
+            replyToMessage = groupChatMessageRepository.findById(dto.getReplyToMessageId())
+                    .orElseThrow(() -> new ResourceNotFoundException("답장할 메시지를 찾을 수 없습니다."));
+            // 같은 채팅방의 메시지인지 확인
+            if (!replyToMessage.getChatRoom().getId().equals(roomId)) {
+                throw new IllegalArgumentException("답장할 메시지가 같은 채팅방에 없습니다.");
+            }
+        }
+
         GroupChatMessage message = GroupChatMessage.builder()
                 .chatRoom(room)
                 .user(currentUser)
                 .message(dto.getMessage())
+                .replyToMessage(replyToMessage)
                 .build();
 
         GroupChatMessage created = groupChatMessageRepository.save(message);
@@ -685,6 +697,28 @@ public class GroupService {
                 displayName = memberOpt.get().getDisplayName();
             }
             
+            // 답장 정보 처리
+            GroupChatMessageDTO.ReplyToMessageInfo replyToMessageInfo = null;
+            if (msg.getReplyToMessage() != null) {
+                GroupChatMessage replyTo = msg.getReplyToMessage();
+                Users replyToUser = replyTo.getUser();
+                // 답장한 메시지 작성자의 displayName 조회
+                String replyToDisplayName = null;
+                Optional<GroupMember> replyToMemberOpt = groupMemberRepository.findByGroupIdAndUserId(groupId, replyToUser.getId());
+                if (replyToMemberOpt.isPresent()) {
+                    replyToDisplayName = replyToMemberOpt.get().getDisplayName();
+                }
+                
+                replyToMessageInfo = GroupChatMessageDTO.ReplyToMessageInfo.builder()
+                        .id(replyTo.getId())
+                        .message(replyTo.getMessage())
+                        .username(replyToUser.getUsername())
+                        .nickname(replyToUser.getNickname())
+                        .displayName(replyToDisplayName)
+                        .profileImageUrl(replyToUser.getProfileImageUrl())
+                        .build();
+            }
+            
             return GroupChatMessageDTO.builder()
                     .id(msg.getId())
                     .message(msg.getMessage())
@@ -695,7 +729,53 @@ public class GroupService {
                     .isAdmin(isAdmin)
                     .createdTime(msg.getCreatedTime())
                     .readCount(msg.getReadCount())
+                    .replyToMessageId(msg.getReplyToMessage() != null ? msg.getReplyToMessage().getId() : null)
+                    .replyToMessage(replyToMessageInfo)
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    /** 채팅 메시지 삭제 */
+    @Transactional
+    public void deleteChatMessage(Long groupId, Long roomId, Long messageId) {
+        Users currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        }
+
+        GroupChatMessage message = groupChatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("메시지를 찾을 수 없습니다."));
+
+        // 같은 채팅방의 메시지인지 확인
+        if (!message.getChatRoom().getId().equals(roomId)) {
+            throw new IllegalArgumentException("메시지가 해당 채팅방에 없습니다.");
+        }
+
+        // 메시지 작성자이거나 관리자인지 확인
+        boolean isAuthor = message.getUser().getId().equals(currentUser.getId());
+        boolean isAdmin = false;
+        
+        // 모임 주인인지 확인
+        Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("모임을 찾을 수 없습니다."));
+        boolean isOwner = group.getOwner().getId().equals(currentUser.getId());
+        
+        if (!isOwner) {
+            // 관리자인지 확인
+            Optional<GroupMember> member = groupMemberRepository.findByGroupIdAndUserId(groupId, currentUser.getId());
+            if (member.isPresent()) {
+                isAdmin = member.get().isAdmin();
+            }
+        } else {
+            isAdmin = true;
+        }
+
+        if (!isAuthor && !isAdmin) {
+            throw new ApplicationUnauthorizedException("메시지 작성자이거나 관리자만 삭제할 수 있습니다.");
+        }
+
+        // 소프트 삭제
+        message.setDeleted(true);
+        groupChatMessageRepository.save(message);
     }
 }

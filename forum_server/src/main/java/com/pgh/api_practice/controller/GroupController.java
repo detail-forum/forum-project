@@ -213,4 +213,14 @@ public class GroupController {
         List<GroupChatMessageDTO> messages = groupService.getChatMessages(groupId, roomId, page, size);
         return ResponseEntity.ok(ApiResponse.ok(messages, "채팅 메시지 목록 조회 성공"));
     }
+
+    /** 채팅 메시지 삭제 */
+    @DeleteMapping("/{groupId}/chat-rooms/{roomId}/messages/{messageId}")
+    public ResponseEntity<ApiResponse<Void>> deleteChatMessage(
+            @PathVariable Long groupId,
+            @PathVariable Long roomId,
+            @PathVariable Long messageId) {
+        groupService.deleteChatMessage(groupId, roomId, messageId);
+        return ResponseEntity.ok(ApiResponse.ok("메시지가 삭제되었습니다."));
+    }
 }

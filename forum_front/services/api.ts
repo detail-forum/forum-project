@@ -477,6 +477,11 @@ export const groupApi = {
     return response.data
   },
 
+  deleteChatMessage: async (groupId: number, roomId: number, messageId: number): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/group/${groupId}/chat-rooms/${roomId}/messages/${messageId}`)
+    return response.data
+  },
+
   getChatMessages: async (groupId: number, roomId: number, page: number = 0, size: number = 50): Promise<ApiResponse<import('@/types/api').GroupChatMessageDTO[]>> => {
     const response = await apiClient.get<ApiResponse<import('@/types/api').GroupChatMessageDTO[]>>(`/group/${groupId}/chat-rooms/${roomId}/messages`, {
       params: { page, size },

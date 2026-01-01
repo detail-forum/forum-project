@@ -404,7 +404,20 @@ export default function ChatRoomPage() {
       // WebSocket 연결 실패 시 REST API로 폴백
       try {
         setSending(true)
-        const response = await groupApi.sendChatMessage(groupId, roomId, { message: newMessage })
+        // @username으로 시작하는 부분 제거
+        let messageToSend = newMessage.trim()
+        if (replyingTo && messageToSend.startsWith('@')) {
+          const replyPrefix = `@${replyingTo.displayName || replyingTo.nickname} `
+          if (messageToSend.startsWith(replyPrefix)) {
+            messageToSend = messageToSend.substring(replyPrefix.length).trim()
+          } else {
+            messageToSend = messageToSend.replace(/^@\w+\s*/, '').trim()
+          }
+        }
+        const response = await groupApi.sendChatMessage(groupId, roomId, { 
+          message: messageToSend,
+          replyToMessageId: replyingTo?.id
+        })
         if (response.success) {
           setNewMessage('')
           setReplyingTo(null) // 답글 초기화
@@ -437,7 +450,7 @@ export default function ChatRoomPage() {
         }
       }
       console.log('메시지 전송 시도:', { groupId, roomId, message: messageToSend, isConnected, replyingTo })
-      const success = wsSendMessage(messageToSend)
+      const success = wsSendMessage(messageToSend, replyingTo?.id)
       console.log('메시지 전송 결과:', success)
       
       if (success) {
@@ -564,13 +577,14 @@ export default function ChatRoomPage() {
     if (!confirm('정말로 이 메시지를 삭제하시겠습니까?')) return
     
     try {
-      // TODO: 메시지 삭제 API 호출
-      // await groupApi.deleteChatMessage(groupId, roomId, messageId)
-      setMessages(prev => prev.filter(m => m.id !== messageId))
-      closeContextMenu()
-    } catch (error) {
+      const response = await groupApi.deleteChatMessage(groupId, roomId, messageId)
+      if (response.success) {
+        setMessages(prev => prev.filter(m => m.id !== messageId))
+        closeContextMenu()
+      }
+    } catch (error: any) {
       console.error('메시지 삭제 실패:', error)
-      alert('메시지 삭제에 실패했습니다.')
+      alert(error.response?.data?.message || '메시지 삭제에 실패했습니다.')
     }
   }
 

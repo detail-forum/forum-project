@@ -29,6 +29,10 @@ public class GroupChatMessage {
     @JoinColumn(name = "user_id", nullable = false)
     private Users user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_message_id")
+    private GroupChatMessage replyToMessage;  // 답장한 메시지
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 

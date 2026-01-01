@@ -35,7 +35,7 @@ public class WebSocketChatService {
 
     /** 메시지 저장 및 DTO 반환 */
     @Transactional
-    public GroupChatMessageDTO saveAndGetMessage(Long groupId, Long roomId, String messageText, String username) {
+    public GroupChatMessageDTO saveAndGetMessage(Long groupId, Long roomId, String messageText, String username, Long replyToMessageId) {
         log.info("saveAndGetMessage 시작: groupId={}, roomId={}, messageText={}, username={}", 
                 groupId, roomId, messageText, username);
         
@@ -81,10 +81,22 @@ public class WebSocketChatService {
             }
         }
 
+        // 답장할 메시지 조회
+        GroupChatMessage replyToMessage = null;
+        if (replyToMessageId != null) {
+            replyToMessage = messageRepository.findById(replyToMessageId)
+                    .orElseThrow(() -> new ResourceNotFoundException("답장할 메시지를 찾을 수 없습니다."));
+            // 같은 채팅방의 메시지인지 확인
+            if (!replyToMessage.getChatRoom().getId().equals(roomId)) {
+                throw new IllegalArgumentException("답장할 메시지가 같은 채팅방에 없습니다.");
+            }
+        }
+
         GroupChatMessage message = GroupChatMessage.builder()
                 .chatRoom(room)
                 .user(currentUser)
                 .message(messageText)
+                .replyToMessage(replyToMessage)
                 .readCount(0)
                 .build();
 
@@ -147,15 +159,58 @@ public class WebSocketChatService {
         Long userId = message.getUser().getId();
         boolean isAdmin = adminIds.contains(userId);
 
+        // 답장 정보 처리
+        GroupChatMessageDTO.ReplyToMessageInfo replyToMessageInfo = null;
+        if (message.getReplyToMessage() != null) {
+            GroupChatMessage replyTo = message.getReplyToMessage();
+            // 답장한 메시지의 작성자 정보 조회
+            Users replyToUser = replyTo.getUser();
+            // 답장한 메시지 작성자의 displayName 조회
+            String displayName = null;
+            try {
+                Optional<com.pgh.api_practice.entity.GroupMember> replyToMember = groupMemberRepository
+                        .findByGroupIdAndUserId(groupId, replyToUser.getId());
+                if (replyToMember.isPresent() && replyToMember.get().getDisplayName() != null) {
+                    displayName = replyToMember.get().getDisplayName();
+                }
+            } catch (Exception e) {
+                log.warn("답장 메시지 작성자의 displayName 조회 실패: {}", e.getMessage());
+            }
+            
+            replyToMessageInfo = GroupChatMessageDTO.ReplyToMessageInfo.builder()
+                    .id(replyTo.getId())
+                    .message(replyTo.getMessage())
+                    .username(replyToUser.getUsername())
+                    .nickname(replyToUser.getNickname())
+                    .displayName(displayName)
+                    .profileImageUrl(replyToUser.getProfileImageUrl())
+                    .build();
+        }
+
+        // 현재 메시지 작성자의 displayName 조회
+        String displayName = null;
+        try {
+            Optional<com.pgh.api_practice.entity.GroupMember> member = groupMemberRepository
+                    .findByGroupIdAndUserId(groupId, userId);
+            if (member.isPresent() && member.get().getDisplayName() != null) {
+                displayName = member.get().getDisplayName();
+            }
+        } catch (Exception e) {
+            log.warn("현재 메시지 작성자의 displayName 조회 실패: {}", e.getMessage());
+        }
+
         return GroupChatMessageDTO.builder()
                 .id(message.getId())
                 .message(message.getMessage())
                 .username(message.getUser().getUsername())
                 .nickname(message.getUser().getNickname())
+                .displayName(displayName)
                 .profileImageUrl(message.getUser().getProfileImageUrl())
                 .isAdmin(isAdmin)
                 .createdTime(message.getCreatedTime())
                 .readCount(message.getReadCount())
+                .replyToMessageId(message.getReplyToMessage() != null ? message.getReplyToMessage().getId() : null)
+                .replyToMessage(replyToMessageInfo)
                 .build();
     }
 }
