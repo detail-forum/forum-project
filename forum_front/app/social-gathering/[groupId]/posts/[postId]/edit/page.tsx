@@ -21,7 +21,7 @@ export default function EditGroupPostPage() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [profileImageUrl, setProfileImageUrl] = useState<string | undefined>(undefined)
-  const [isPublic, setIsPublic] = useState(true)
+  const [isPublic, setIsPublic] = useState<boolean | null>(null)
   const [showImageCrop, setShowImageCrop] = useState(false)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
@@ -45,7 +45,17 @@ export default function EditGroupPostPage() {
         setTitle(response.data.title)
         setBody(response.data.body)
         setProfileImageUrl(response.data.profileImageUrl)
-        setIsPublic(response.data.isPublic ?? true)
+        
+        // isPublic 값을 처리 (boolean, number(0/1), 또는 undefined/null)
+        const isPublicValue = response.data.isPublic !== undefined && response.data.isPublic !== null
+          ? (typeof response.data.isPublic === 'boolean' 
+              ? response.data.isPublic 
+              : (typeof response.data.isPublic === 'number' 
+                  ? response.data.isPublic !== 0 
+                  : Boolean(response.data.isPublic)))
+          : true // 기본값
+        
+        setIsPublic(isPublicValue)
       }
     } catch (error) {
       console.error('게시물 조회 실패:', error)
@@ -110,7 +120,7 @@ export default function EditGroupPostPage() {
         title,
         body,
         profileImageUrl,
-        isPublic,
+        isPublic: isPublic ?? true,
       })
 
       if (response.success) {
@@ -225,17 +235,24 @@ export default function EditGroupPostPage() {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
+            <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-700">
-                외부 게시물로 공개 (모임 외부에서도 볼 수 있게 함)
+              외부 게시물로 공개 (모임 외부에서도 볼 수 있게 함)
               </span>
-            </label>
+              <button
+              type="button"
+              onClick={() => setIsPublic((prev) => prev !== null ? !prev : true)}
+              className={`relative inline-flex items-center h-6 w-11 rounded-full transition-colors focus:outline-none ${
+                isPublic === true ? 'bg-blue-500' : 'bg-gray-300'
+              }`}
+              >
+              <span
+                className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
+                isPublic === true ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+              </button>
+            </div>
           </div>
 
           <div className="flex gap-4">
