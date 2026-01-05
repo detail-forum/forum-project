@@ -163,10 +163,19 @@ export default function ResizableImage({
     
     // 마크다운에서 URL 추출 시 width/height 속성 제거
     // 예: "/uploads/image.jpg width=\"300\" height=\"200\"" -> "/uploads/image.jpg"
-    normalizedUrl = normalizedUrl.replace(/\s+width=["']?\d+["']?\s*height=["']?\d+["']?/gi, '')
-    normalizedUrl = normalizedUrl.replace(/\s+height=["']?\d+["']?\s*width=["']?\d+["']?/gi, '')
-    normalizedUrl = normalizedUrl.replace(/\s+width=["']?\d+["']?/gi, '')
-    normalizedUrl = normalizedUrl.replace(/\s+height=["']?\d+["']?/gi, '')
+    // 1. width="..." height="..." 패턴
+    normalizedUrl = normalizedUrl.replace(/\s+width\s*=\s*["']?\d+["']?\s*height\s*=\s*["']?\d+["']?/gi, '')
+    // 2. height="..." width="..." 패턴
+    normalizedUrl = normalizedUrl.replace(/\s+height\s*=\s*["']?\d+["']?\s*width\s*=\s*["']?\d+["']?/gi, '')
+    // 3. width="..." 단독
+    normalizedUrl = normalizedUrl.replace(/\s+width\s*=\s*["']?\d+["']?/gi, '')
+    // 4. height="..." 단독
+    normalizedUrl = normalizedUrl.replace(/\s+height\s*=\s*["']?\d+["']?/gi, '')
+    // 5. URL 인코딩된 크기 정보 제거 (%20width=%22...%22 등)
+    normalizedUrl = normalizedUrl.replace(/%20width%3D%22\d+%22%20height%3D%22\d+%22/gi, '')
+    normalizedUrl = normalizedUrl.replace(/%20height%3D%22\d+%22%20width%3D%22\d+%22/gi, '')
+    normalizedUrl = normalizedUrl.replace(/%20width%3D%22\d+%22/gi, '')
+    normalizedUrl = normalizedUrl.replace(/%20height%3D%22\d+%22/gi, '')
     normalizedUrl = normalizedUrl.trim()
     
     if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {

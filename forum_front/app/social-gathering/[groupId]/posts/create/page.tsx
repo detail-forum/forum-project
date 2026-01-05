@@ -73,12 +73,26 @@ export default function CreateGroupPostPage() {
   // 이미지 크기 변경 핸들러
   const handleImageSizeChange = useCallback((newMarkdown: string) => {
     // 마크다운에서 URL 추출하여 기존 마크다운 찾기
-    const urlMatch = newMarkdown.match(/!\[([^\]]*)\]\(([^)]+?)(?:\s+width="\d+"\s+height="\d+")?\)/)
+    const urlMatch = newMarkdown.match(/!\[([^\]]*)\]\(([^)]+?)(?:\s+width=["']?\d+["']?\s*height=["']?\d+["']?)?\)/)
     if (!urlMatch) return
     
-    const url = urlMatch[2].trim()
+    // URL에서 크기 정보 제거
+    let url = urlMatch[2].trim()
+    url = url.replace(/\s+width\s*=\s*["']?\d+["']?\s*height\s*=\s*["']?\d+["']?/gi, '')
+    url = url.replace(/\s+height\s*=\s*["']?\d+["']?\s*width\s*=\s*["']?\d+["']?/gi, '')
+    url = url.replace(/\s+width\s*=\s*["']?\d+["']?/gi, '')
+    url = url.replace(/\s+height\s*=\s*["']?\d+["']?/gi, '')
+    url = url.replace(/%20width%3D%22\d+%22%20height%3D%22\d+%22/gi, '')
+    url = url.replace(/%20height%3D%22\d+%22%20width%3D%22\d+%22/gi, '')
+    url = url.replace(/%20width%3D%22\d+%22/gi, '')
+    url = url.replace(/%20height%3D%22\d+%22/gi, '')
+    url = url.trim()
+    
     // 기존 본문에서 해당 URL을 가진 이미지 마크다운 찾기 (크기 정보 포함/미포함 모두)
-    const oldPattern = new RegExp(`!\\[([^\\]]*)\\]\\(${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s+width="\\d+"\\s+height="\\d+")?\\)`, 'g')
+    // URL을 이스케이프하여 정규식 패턴 생성
+    const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // 다양한 크기 정보 패턴을 포함한 정규식
+    const oldPattern = new RegExp(`!\\[([^\\]]*)\\]\\(${escapedUrl}(?:\\s+width=["']?\\d+["']?\\s*height=["']?\\d+["']?)?\\)`, 'g')
     
     setBody((prev) => prev.replace(oldPattern, newMarkdown))
   }, [])
@@ -275,11 +289,23 @@ export default function CreateGroupPostPage() {
 
     // 모든 이미지 매치 찾기
     while ((match = imagePattern.exec(body)) !== null) {
+      // URL 추출 - 크기 정보가 포함된 경우를 처리
       let url = match[2].trim()
-      url = url.replace(/\s+width=["']?\d+["']?\s*height=["']?\d+["']?/gi, '')
-      url = url.replace(/\s+height=["']?\d+["']?\s*width=["']?\d+["']?/gi, '')
-      url = url.replace(/\s+width=["']?\d+["']?/gi, '')
-      url = url.replace(/\s+height=["']?\d+["']?/gi, '')
+      
+      // 크기 정보 제거 (다양한 패턴 처리)
+      // 1. width="..." height="..." 패턴
+      url = url.replace(/\s+width\s*=\s*["']?\d+["']?\s*height\s*=\s*["']?\d+["']?/gi, '')
+      // 2. height="..." width="..." 패턴
+      url = url.replace(/\s+height\s*=\s*["']?\d+["']?\s*width\s*=\s*["']?\d+["']?/gi, '')
+      // 3. width="..." 단독
+      url = url.replace(/\s+width\s*=\s*["']?\d+["']?/gi, '')
+      // 4. height="..." 단독
+      url = url.replace(/\s+height\s*=\s*["']?\d+["']?/gi, '')
+      // 5. URL 인코딩된 크기 정보 제거 (%20width=%22...%22 등)
+      url = url.replace(/%20width%3D%22\d+%22%20height%3D%22\d+%22/gi, '')
+      url = url.replace(/%20height%3D%22\d+%22%20width%3D%22\d+%22/gi, '')
+      url = url.replace(/%20width%3D%22\d+%22/gi, '')
+      url = url.replace(/%20height%3D%22\d+%22/gi, '')
       url = url.trim()
 
       if (url) {
