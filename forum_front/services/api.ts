@@ -119,11 +119,18 @@ apiClient.interceptors.response.use(
         removeCookie('accessToken')
         removeCookie('refreshToken')
         store.dispatch(logout())
-        
+
         // 사용자에게 명확한 메시지 표시
-        const errorMessage = error.response?.data?.message || '로그인이 필요합니다.'
+        let errorMessage = '로그인이 필요합니다.'
+        if (
+          error.response &&
+          error.response.data &&
+          typeof (error.response.data as any).message === 'string'
+        ) {
+          errorMessage = (error.response.data as any).message
+        }
         console.warn('인증 실패:', errorMessage)
-        
+
         window.location.href = '/'
         return Promise.reject(error)
       }
