@@ -19,7 +19,8 @@ export function decodeJWT(token: string): any {
 export function getUsernameFromToken(): string | null {
   if (typeof window === 'undefined') return null
   
-  const token = localStorage.getItem('accessToken')
+  const { getCookie } = require('@/utils/cookies')
+  const token = getCookie('accessToken')
   if (!token) return null
 
   const decoded = decodeJWT(token)

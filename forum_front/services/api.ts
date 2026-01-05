@@ -14,6 +14,9 @@ import type {
   UpdateCommentDTO,
 } from '@/types/api'
 import { cache } from '@/utils/cache'
+import { store } from '@/store/store'
+import { updateTokens, logout } from '@/store/slices/authSlice'
+import { getCookie, setCookie, removeCookie } from '@/utils/cookies'
 
 // 프로덕션: HTTPS 도메인 사용
 // 개발 환경에서는 환경 변수로 localhost:8081 사용 가능
@@ -31,7 +34,10 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('accessToken')
+      // Redux store에서 토큰 가져오기 (우선순위)
+      const state = store.getState()
+      const token = state.auth.accessToken || getCookie('accessToken')
+      
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
@@ -101,14 +107,17 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
       isRefreshing = true
 
-      const refreshToken = localStorage.getItem('refreshToken')
+      // 쿠키에서 refreshToken 가져오기 (Redux store 우선)
+      const state = store.getState()
+      const refreshToken = state.auth.refreshToken || getCookie('refreshToken')
 
       if (!refreshToken) {
         // RefreshToken이 없으면 로그아웃
         processQueue(error)
         isRefreshing = false
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
+        removeCookie('accessToken')
+        removeCookie('refreshToken')
+        store.dispatch(logout())
         window.location.href = '/'
         return Promise.reject(error)
       }
@@ -123,9 +132,12 @@ apiClient.interceptors.response.use(
         if (response.data.success && response.data.data) {
           const { accessToken, refreshToken: newRefreshToken } = response.data.data
 
-          // 새 토큰 저장
-          localStorage.setItem('accessToken', accessToken)
-          localStorage.setItem('refreshToken', newRefreshToken)
+          // 쿠키에 새 토큰 저장
+          setCookie('accessToken', accessToken, 1) // 1일
+          setCookie('refreshToken', newRefreshToken, 7) // 7일
+
+          // Redux 상태 업데이트 (중요!)
+          store.dispatch(updateTokens({ accessToken, refreshToken: newRefreshToken }))
 
           // 대기 중인 요청들 처리
           processQueue(null, accessToken)
@@ -143,8 +155,9 @@ apiClient.interceptors.response.use(
         // RefreshToken도 만료되었거나 유효하지 않음
         processQueue(refreshError as AxiosError)
         isRefreshing = false
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
+        removeCookie('accessToken')
+        removeCookie('refreshToken')
+        store.dispatch(logout())
         window.location.href = '/'
         return Promise.reject(refreshError)
       }
@@ -153,7 +166,7 @@ apiClient.interceptors.response.use(
     return Promise.reject(error)
   }
 )
-
+  
 // Auth API
 export const authApi = {
   getCurrentUser: async (): Promise<ApiResponse<import('@/types/api').User>> => {

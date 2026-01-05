@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store/store'
 import { groupApi, imageUploadApi } from '@/services/api'
 import Header from '@/components/Header'
 import ImageCropModal from '@/components/ImageCropModal'
+import ImageInsertButton from '@/components/ImageInsertButton'
 import LoginModal from '@/components/LoginModal'
 
 export default function CreateGroupPostPage() {
@@ -23,6 +24,7 @@ export default function CreateGroupPostPage() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -60,6 +62,11 @@ export default function CreateGroupPostPage() {
       setSelectedImage(null)
       setImagePreview('')
     }
+  }
+
+  const handleImageInserted = (markdown: string) => {
+    // 이미지 마크다운을 본문에 추가
+    setBody(body + '\n' + markdown + '\n')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,10 +199,17 @@ export default function CreateGroupPostPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              본문 *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                본문 *
+              </label>
+              <ImageInsertButton
+                onImageInserted={handleImageInserted}
+                textareaRef={textareaRef}
+              />
+            </div>
             <textarea
+              ref={textareaRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -204,6 +218,9 @@ export default function CreateGroupPostPage() {
               required
               minLength={10}
             />
+            <p className="mt-1 text-xs text-gray-500">
+              이미지 버튼을 클릭하여 이미지를 업로드하고 삽입할 수 있습니다.
+            </p>
           </div>
 
           <div className="flex gap-4">

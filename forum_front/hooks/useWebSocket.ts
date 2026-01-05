@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Client, IMessage } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
+import { store } from '@/store/store'
+import { getCookie } from '@/utils/cookies'
 
 interface UseWebSocketOptions {
   groupId: number
@@ -40,7 +42,9 @@ export function useWebSocket({
   // 토큰 가져오기
   const getToken = useCallback(() => {
     if (typeof window === 'undefined') return null
-    return localStorage.getItem('accessToken')
+    // Redux store에서 먼저 확인, 없으면 쿠키에서
+    const state = store.getState()
+    return state.auth.accessToken || getCookie('accessToken')
   }, [])
 
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { setCookie, removeCookie } from '@/utils/cookies'
 
 interface AuthState {
   accessToken: string | null
@@ -22,16 +23,23 @@ const authSlice = createSlice({
       state.refreshToken = action.payload.refreshToken
       state.isAuthenticated = true
       if (typeof window !== 'undefined') {
-        localStorage.setItem('accessToken', action.payload.accessToken)
-        localStorage.setItem('refreshToken', action.payload.refreshToken)
+        setCookie('accessToken', action.payload.accessToken, 1) // 1일
+        setCookie('refreshToken', action.payload.refreshToken, 7) // 7일
+        // 기존 localStorage 정리 (마이그레이션)
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
       }
     },
     updateTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken: string }>) => {
       state.accessToken = action.payload.accessToken
       state.refreshToken = action.payload.refreshToken
+      state.isAuthenticated = true // 토큰 업데이트 시 인증 상태 유지
       if (typeof window !== 'undefined') {
-        localStorage.setItem('accessToken', action.payload.accessToken)
-        localStorage.setItem('refreshToken', action.payload.refreshToken)
+        setCookie('accessToken', action.payload.accessToken, 1)
+        setCookie('refreshToken', action.payload.refreshToken, 7)
+        // 기존 localStorage 정리 (마이그레이션)
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
       }
     },
     logout: (state) => {
@@ -40,8 +48,10 @@ const authSlice = createSlice({
       state.refreshToken = null
       state.isAuthenticated = false
       
-      // localStorage에서 토큰 완전히 제거
+      // 쿠키와 localStorage에서 토큰 완전히 제거
       if (typeof window !== 'undefined') {
+        removeCookie('accessToken')
+        removeCookie('refreshToken')
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')
       }

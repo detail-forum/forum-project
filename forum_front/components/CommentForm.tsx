@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { commentApi } from '@/services/api'
+import { store } from '@/store/store'
+import { logout } from '@/store/slices/authSlice'
 
 interface CommentFormProps {
   postId: number
@@ -52,10 +54,9 @@ export default function CommentForm({
       alert(errorMessage)
       console.error('댓글 작성 실패:', err)
       
-      // 403 오류 시 로그인 페이지로 리다이렉트
+      // 403 오류 시 로그아웃 처리
       if (err.response?.status === 403 && typeof window !== 'undefined') {
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
+        store.dispatch(logout())
         setTimeout(() => {
           window.location.href = '/'
         }, 1000)
