@@ -97,7 +97,14 @@ export default function MyPostsPage() {
       {!isAuthenticated && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center py-20">
+            <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">내 게시글</h1>
+              <Link href="/my-posts/dashboard">
+                <button className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-xs shadow-lg">
+                  통계
+                </button>
+              </Link>
+            </div>
             <p className="text-gray-600 mb-6">내 게시글을 보려면 로그인이 필요합니다.</p>
             <button
               onClick={() => setShowLoginModal(true)}
@@ -147,11 +154,6 @@ export default function MyPostsPage() {
                 </div>
               </div>
             )}
-            <Link href="/my-posts/dashboard">
-              <button className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-xs shadow-lg">
-                통계
-              </button>
-            </Link>
           </div>
 
         {loading && posts.length === 0 ? (
