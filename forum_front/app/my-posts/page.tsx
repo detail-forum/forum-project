@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store/store'
 import { postApi } from '@/services/api'
@@ -146,6 +147,11 @@ export default function MyPostsPage() {
                 </div>
               </div>
             )}
+            <Link href="/my-posts/dashboard">
+              <button className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-xs shadow-lg">
+                대시보드
+              </button>
+            </Link>
           </div>
 
         {loading && posts.length === 0 ? (
