@@ -575,6 +575,13 @@ export const groupApi = {
     })
     return response.data
   },
+
+  searchChatMessages: async (groupId: number, roomId: number, query: string, page: number = 0, size: number = 20): Promise<ApiResponse<{ content: import('@/types/api').GroupChatMessageDTO[]; totalElements: number; totalPages: number }>> => {
+    const response = await apiClient.get<ApiResponse<{ content: import('@/types/api').GroupChatMessageDTO[]; totalElements: number; totalPages: number }>>(`/group/${groupId}/chat-rooms/${roomId}/messages/search`, {
+      params: { query, page, size },
+    })
+    return response.data
+  },
 }
 
 // Image Upload API
@@ -597,6 +604,30 @@ export const imageUploadApi = {
 
   deleteImage: async (filename: string): Promise<ApiResponse<void>> => {
     const response = await apiClient.delete<ApiResponse<void>>(`/upload/image/${filename}`)
+    return response.data
+  },
+}
+
+// File Upload API
+export const fileUploadApi = {
+  uploadFile: async (file: File): Promise<ApiResponse<{ url: string; filename: string; originalFilename: string; fileSize: number }>> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await apiClient.post<ApiResponse<{ url: string; filename: string; originalFilename: string; fileSize: number }>>(
+      '/upload/file',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+    return response.data
+  },
+
+  deleteFile: async (filename: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/upload/file/${filename}`)
     return response.data
   },
 }

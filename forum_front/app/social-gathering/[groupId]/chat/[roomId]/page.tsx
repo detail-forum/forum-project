@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store/store'
-import { groupApi, imageUploadApi } from '@/services/api'
+import { groupApi, imageUploadApi, fileUploadApi } from '@/services/api'
 import type { GroupChatMessageDTO, GroupChatRoomDTO, GroupDetailDTO, GroupMemberDTO } from '@/types/api'
 import Header from '@/components/Header'
 import LoginModal from '@/components/LoginModal'
@@ -81,6 +81,16 @@ export default function ChatRoomPage() {
   const [updatingDisplayName, setUpdatingDisplayName] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [settingsTab, setSettingsTab] = useState<'room' | 'displayName'>('displayName')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [searchResults, setSearchResults] = useState<GroupChatMessageDTO[]>([])
+  const [searching, setSearching] = useState(false)
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const attachmentMenuRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState(false)
 
   useEffect(() => {
     if (groupId) {
@@ -584,6 +594,17 @@ export default function ChatRoomPage() {
     }
   }, [contextMenu])
 
+  // 첨부 메뉴 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+        setShowAttachmentMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   // 메시지 삭제
   const handleDeleteMessage = async (messageId: number) => {
     if (!confirm('정말로 이 메시지를 삭제하시겠습니까?')) return
@@ -679,6 +700,170 @@ export default function ChatRoomPage() {
     } catch (error: any) {
       console.error('반응 추가/제거 실패:', error)
       alert(error.response?.data?.message || '반응 추가/제거에 실패했습니다.')
+    }
+  }
+
+  // 채팅 검색
+  const handleSearchMessages = async () => {
+    const query = prompt('검색어를 입력하세요:')
+    if (!query || !query.trim()) return
+
+    try {
+      setSearching(true)
+      setSearchQuery(query)
+      
+      // 백엔드 API 호출 시도
+      try {
+        const response = await groupApi.searchChatMessages(groupId, roomId, query)
+        if (response.success && response.data) {
+          setSearchResults(response.data.content || [])
+          setShowSearchResults(true)
+          return
+        }
+      } catch (apiError) {
+        console.log('백엔드 검색 API 미구현, 클라이언트 측 필터링 사용')
+      }
+      
+      // 백엔드 API가 없으면 클라이언트 측 필터링 (임시)
+      const filtered = messages.filter(msg => 
+        msg.message.toLowerCase().includes(query.toLowerCase())
+      )
+      setSearchResults(filtered)
+      setShowSearchResults(true)
+    } catch (error: any) {
+      console.error('채팅 검색 실패:', error)
+      alert(error.response?.data?.message || '채팅 검색에 실패했습니다.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // 이미지 업로드 및 전송
+  const handleImageUpload = async (file: File) => {
+    try {
+      setUploadingImage(true)
+      const uploadResponse = await imageUploadApi.uploadImage(file)
+      
+      if (uploadResponse.success && uploadResponse.data) {
+        const imageUrl = uploadResponse.data.url
+        
+        // WebSocket으로 이미지 메시지 전송
+        if (isConnected) {
+          // TODO: WebSocket 메시지 타입 확장 필요
+          // wsSendMessage('', null, 'IMAGE', imageUrl)
+          
+          // 임시: REST API로 전송
+          const response = await groupApi.sendChatMessage(groupId, roomId, {
+            message: '',
+            messageType: 'IMAGE',
+            fileUrl: imageUrl
+          } as any)
+          
+          if (response.success) {
+            setTimeout(() => {
+              fetchMessages()
+            }, 500)
+          }
+        } else {
+          // REST API로 전송
+          const response = await groupApi.sendChatMessage(groupId, roomId, {
+            message: '',
+            messageType: 'IMAGE',
+            fileUrl: imageUrl
+          } as any)
+          
+          if (response.success) {
+            setTimeout(() => {
+              fetchMessages()
+            }, 500)
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('이미지 업로드 실패:', error)
+      alert(error.response?.data?.message || '이미지 업로드에 실패했습니다.')
+    } finally {
+      setUploadingImage(false)
+      setShowAttachmentMenu(false)
+    }
+  }
+
+  // 파일 업로드 및 전송
+  const handleFileUpload = async (file: File) => {
+    try {
+      setUploadingFile(true)
+      
+      // 파일 업로드 API 호출 시도
+      let fileUrl: string
+      let fileName: string
+      let fileSize: number
+      
+      try {
+        const uploadResponse = await fileUploadApi.uploadFile(file)
+        if (uploadResponse.success && uploadResponse.data) {
+          fileUrl = uploadResponse.data.url
+          fileName = uploadResponse.data.originalFilename || file.name
+          fileSize = uploadResponse.data.fileSize || file.size
+        } else {
+          throw new Error('파일 업로드 실패')
+        }
+      } catch (uploadError) {
+        // 파일 업로드 API가 없으면 이미지 업로드 API 사용 (임시)
+        console.log('파일 업로드 API 미구현, 이미지 업로드 API 사용')
+        const uploadResponse = await imageUploadApi.uploadImage(file)
+        if (uploadResponse.success && uploadResponse.data) {
+          fileUrl = uploadResponse.data.url
+          fileName = file.name
+          fileSize = file.size
+        } else {
+          throw new Error('파일 업로드 실패')
+        }
+      }
+      
+      // REST API로 파일 메시지 전송
+      const response = await groupApi.sendChatMessage(groupId, roomId, {
+        message: '',
+        messageType: 'FILE',
+        fileUrl: fileUrl,
+        fileName: fileName,
+        fileSize: fileSize
+      } as any)
+      
+      if (response.success) {
+        setTimeout(() => {
+          fetchMessages()
+        }, 500)
+      }
+    } catch (error: any) {
+      console.error('파일 업로드 실패:', error)
+      alert(error.response?.data?.message || '파일 업로드에 실패했습니다.')
+    } finally {
+      setUploadingFile(false)
+      setShowAttachmentMenu(false)
+    }
+  }
+
+  // 이미지 선택
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('이미지 크기는 10MB 이하여야 합니다.')
+        return
+      }
+      handleImageUpload(file)
+    }
+  }
+
+  // 파일 선택
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        alert('파일 크기는 50MB 이하여야 합니다.')
+        return
+      }
+      handleFileUpload(file)
     }
   }
 
@@ -1047,8 +1232,89 @@ export default function ChatRoomPage() {
                       </p>
                     )}
                   </div>
-                  {/* 멤버 수 표시 및 멤버 목록 버튼 */}
+                  {/* 검색 버튼 및 멤버 수 표시 */}
                   <div className="flex items-center gap-2">
+                    {/* 검색 버튼 */}
+                    <div className="relative">
+                      <button
+                        onClick={handleSearchMessages}
+                        disabled={searching}
+                        className="p-2 text-gray-400 hover:text-gray-600 transition disabled:opacity-50"
+                        title="채팅 검색"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </button>
+                      {/* 검색 결과 표시 */}
+                      {showSearchResults && searchResults.length > 0 && (
+                        <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-[400px] max-w-[600px] max-h-[400px] overflow-y-auto z-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium">검색 결과: "{searchQuery}" ({searchResults.length}개)</span>
+                            <button
+                              onClick={() => {
+                                setShowSearchResults(false)
+                                setSearchQuery('')
+                                setSearchResults([])
+                              }}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {searchResults.map((message) => (
+                              <div
+                                key={message.id}
+                                onClick={() => {
+                                  // 해당 메시지로 스크롤
+                                  const messageElement = document.querySelector(`[data-message-id="${message.id}"]`)
+                                  if (messageElement) {
+                                    messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                    messageElement.classList.add('ring-2', 'ring-blue-500')
+                                    setTimeout(() => {
+                                      messageElement.classList.remove('ring-2', 'ring-blue-500')
+                                    }, 2000)
+                                  }
+                                  setShowSearchResults(false)
+                                }}
+                                className="p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-100"
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-medium text-gray-700">
+                                    {message.displayName || message.nickname}
+                                  </span>
+                                  <span className="text-xs text-gray-400">
+                                    {format(new Date(message.createdTime), 'MM/dd HH:mm', { locale: ko })}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-600 line-clamp-2">
+                                  {message.message}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {showSearchResults && searchResults.length === 0 && searchQuery && (
+                        <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-[300px] z-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">검색 결과 없음</span>
+                            <button
+                              onClick={() => {
+                                setShowSearchResults(false)
+                                setSearchQuery('')
+                              }}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <p className="text-sm text-gray-500">"{searchQuery}"에 대한 검색 결과가 없습니다.</p>
+                        </div>
+                      )}
+                    </div>
+                    {/* 멤버 수 표시 버튼 */}
                     <button
                       onClick={() => {
                         setShowMembers(!showMembers)
@@ -1216,9 +1482,41 @@ export default function ChatRoomPage() {
                                           : 'bg-white text-gray-900 border border-gray-200'
                                       }`}
                                     >
-                                      <p className="text-sm whitespace-pre-wrap break-words">
-                                        {message.message}
-                                      </p>
+                                      {/* 이미지 메시지 */}
+                                      {message.messageType === 'IMAGE' && message.fileUrl ? (
+                                        <img
+                                          src={message.fileUrl}
+                                          alt="이미지"
+                                          className="max-w-full h-auto rounded cursor-pointer"
+                                          onClick={() => window.open(message.fileUrl, '_blank')}
+                                        />
+                                      ) : message.messageType === 'FILE' && message.fileUrl ? (
+                                        /* 파일 메시지 */
+                                        <a
+                                          href={message.fileUrl}
+                                          download={message.fileName}
+                                          className={`flex items-center gap-2 text-sm hover:underline ${
+                                            isMyMessage ? 'text-white' : 'text-gray-900'
+                                          }`}
+                                        >
+                                          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                          </svg>
+                                          <div className="min-w-0">
+                                            <div className="truncate">{message.fileName || '파일'}</div>
+                                            {message.fileSize && (
+                                              <div className={`text-xs ${isMyMessage ? 'text-blue-100' : 'text-gray-500'}`}>
+                                                {(message.fileSize / 1024).toFixed(1)} KB
+                                              </div>
+                                            )}
+                                          </div>
+                                        </a>
+                                      ) : (
+                                        /* 텍스트 메시지 */
+                                        <p className="text-sm whitespace-pre-wrap break-words">
+                                          {message.message}
+                                        </p>
+                                      )}
                                       {/* 반응 표시 */}
                                       {message.reactions && message.reactions.length > 0 && (
                                         <div className="flex gap-1 mt-2 flex-wrap">
@@ -1380,18 +1678,78 @@ export default function ChatRoomPage() {
                     </button>
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-end">
+                  {/* 첨부 버튼 */}
+                  <div className="relative" ref={attachmentMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                      disabled={sending || !isAuthenticated || uploadingImage || uploadingFile}
+                      className="p-2 text-gray-400 hover:text-gray-600 transition disabled:opacity-50"
+                      title="첨부"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                    {/* 첨부 메뉴 */}
+                    {showAttachmentMenu && (
+                      <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 min-w-[150px] z-50">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            imageInputRef.current?.click()
+                            setShowAttachmentMenu(false)
+                          }}
+                          disabled={uploadingImage}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {uploadingImage ? '업로드 중...' : '이미지'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            fileInputRef.current?.click()
+                            setShowAttachmentMenu(false)
+                          }}
+                          disabled={uploadingFile}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          {uploadingFile ? '업로드 중...' : '파일'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                   <input
                     type="text"
                     value={newMessage}
                     onChange={handleInputChange}
                     placeholder={replyingTo ? `@${replyingTo.nickname}에게 답장...` : "메시지를 입력하세요..."}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={sending || !isAuthenticated || !isConnected}
+                    disabled={sending || !isAuthenticated || !isConnected || uploadingImage || uploadingFile}
                   />
                   <button
                     type="submit"
-                    disabled={sending || !newMessage.trim() || !isAuthenticated}
+                    disabled={sending || !newMessage.trim() || !isAuthenticated || uploadingImage || uploadingFile}
                     className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   >
                     {sending ? '전송 중...' : '전송'}

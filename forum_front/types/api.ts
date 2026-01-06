@@ -267,6 +267,10 @@ export interface GroupChatMessageDTO {
   }
   reactions?: ReactionInfo[]  // 반응 정보
   myReactions?: string[]  // 현재 사용자가 추가한 반응 목록
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE'  // 메시지 타입
+  fileUrl?: string  // 이미지/파일 URL
+  fileName?: string  // 파일명 (파일 타입일 때만)
+  fileSize?: number  // 파일 크기 (바이트, 파일 타입일 때만)
 }
 
 export interface ReactionInfo {
@@ -277,4 +281,8 @@ export interface ReactionInfo {
 export interface CreateGroupChatMessageDTO {
   message: string
   replyToMessageId?: number  // 답장한 메시지 ID
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE'  // 메시지 타입
+  fileUrl?: string  // 이미지/파일 URL
+  fileName?: string  // 파일명 (파일 타입일 때만)
+  fileSize?: number  // 파일 크기 (바이트, 파일 타입일 때만)
 }
