@@ -149,7 +149,7 @@ export default function MyPostsPage() {
             )}
             <Link href="/my-posts/dashboard">
               <button className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-xs shadow-lg">
-                대시보드
+                통계
               </button>
             </Link>
           </div>
