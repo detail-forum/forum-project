@@ -32,8 +32,8 @@ export default function ChatRoomPage() {
   const [uploadingProfile, setUploadingProfile] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const currentUsername = getUsernameFromToken()
-  const currentUsernameRef = useRef<string | null>(currentUsername)
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null)
+  const currentUsernameRef = useRef<string | null>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const profileImageInputRef = useRef<HTMLInputElement>(null)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
@@ -46,7 +46,19 @@ export default function ChatRoomPage() {
   const [replyingTo, setReplyingTo] = useState<GroupChatMessageDTO | null>(null)
   const pendingReplyRef = useRef<{ replyTo: GroupChatMessageDTO; messageText: string; timestamp: number } | null>(null) // 전송 중인 답장 정보
   
-  // currentUsername 업데이트
+  // currentUsername 초기화 및 업데이트
+  useEffect(() => {
+    if (isAuthenticated) {
+      const username = getUsernameFromToken()
+      setCurrentUsername(username)
+      currentUsernameRef.current = username
+    } else {
+      setCurrentUsername(null)
+      currentUsernameRef.current = null
+    }
+  }, [isAuthenticated])
+  
+  // currentUsername 변경 시 ref 업데이트
   useEffect(() => {
     currentUsernameRef.current = currentUsername
   }, [currentUsername])

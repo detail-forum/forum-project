@@ -19,12 +19,28 @@ export function decodeJWT(token: string): any {
 export function getUsernameFromToken(): string | null {
   if (typeof window === 'undefined') return null
   
-  const { getCookie } = require('@/utils/cookies')
-  const token = getCookie('accessToken')
-  if (!token) return null
-
-  const decoded = decodeJWT(token)
-  return decoded?.sub || decoded?.username || null
+  // Redux store에서 토큰 가져오기 (HttpOnly 쿠키는 JavaScript에서 읽을 수 없음)
+  try {
+    const { store } = require('@/store/store')
+    const state = store.getState()
+    const token = state.auth.accessToken
+    
+    if (!token) {
+      // Redux store에 토큰이 없으면 쿠키에서 시도 (마이그레이션용)
+      const { getCookie } = require('@/utils/cookies')
+      const cookieToken = getCookie('accessToken')
+      if (!cookieToken) return null
+      
+      const decoded = decodeJWT(cookieToken)
+      return decoded?.sub || decoded?.username || null
+    }
+    
+    const decoded = decodeJWT(token)
+    return decoded?.sub || decoded?.username || null
+  } catch (error) {
+    console.error('getUsernameFromToken 오류:', error)
+    return null
+  }
 }
 
 // JWT 토큰 만료 여부 확인
