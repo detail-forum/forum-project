@@ -144,6 +144,13 @@ export default function Header({ onLoginClick }: HeaderProps) {
                 >
                   모임
                 </Link>
+                <Link
+                  href="/chat"
+                  className="text-gray-700 hover:text-primary transition-colors"
+                  prefetch={true}
+                >
+                  채팅
+                </Link>
                   </>
                 ) : (
                   <>
