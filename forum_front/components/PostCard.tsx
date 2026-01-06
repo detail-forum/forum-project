@@ -85,6 +85,21 @@ function PostCard({ post }: PostCardProps) {
         )}
         {/* 오버레이 그라데이션 */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        
+        {/* 그룹명 오버레이 - 상단 */}
+        {post.groupName && (
+          <div className="absolute top-3 left-3 z-10">
+            <Link
+              href={`/social-gathering/${post.groupId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-block px-3 py-1.5 bg-blue-500/90 backdrop-blur-sm text-white rounded-lg text-sm font-medium hover:bg-blue-600/90 transition-colors shadow-lg"
+              title={post.groupName}
+            >
+              {post.groupName}
+            </Link>
+          </div>
+        )}
+        
         {/* 제목 오버레이 */}
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <h3 className="text-white font-semibold text-base line-clamp-2 drop-shadow-lg">
@@ -93,17 +108,10 @@ function PostCard({ post }: PostCardProps) {
         </div>
       </div>
       
-      {/* 카드 하단 정보 - 컴팩트하게 */}
+      {/* 카드 하단 정보 - 일반 게시물과 동일한 디자인 */}
       <div className="p-3 flex-1 flex flex-col justify-between">
         <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-          <div className="flex items-center gap-2">
-            {post.groupName && (
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                {(post.groupName).slice(0, 7  )}..
-              </span>
-            )}
-            <span className="font-medium text-gray-800">{(post.username)}</span>
-          </div>
+          <span className="font-medium text-gray-800">{post.username}</span>
           <span className="text-gray-500">{formatDate(post.createDateTime)}</span>
         </div>
         <div className="flex items-center justify-between text-xs text-gray-500">
@@ -128,6 +136,11 @@ function PostCard({ post }: PostCardProps) {
                 #{tag}
               </button>
             ))}
+            {post.tags.length > 3 && (
+              <span className="px-2 py-0.5 text-gray-400 text-xs">
+                +{post.tags.length - 3}
+              </span>
+            )}
           </div>
         )}
       </div>
