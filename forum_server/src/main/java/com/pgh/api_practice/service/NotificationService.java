@@ -265,6 +265,10 @@ public class NotificationService {
 
         if (notification.getRelatedGroupPost() != null) {
             builder.relatedGroupPostId(notification.getRelatedGroupPost().getId());
+            // 그룹 ID 추가
+            if (notification.getRelatedGroupPost().getGroup() != null) {
+                builder.relatedGroupId(notification.getRelatedGroupPost().getGroup().getId());
+            }
         }
 
         if (notification.getRelatedComment() != null) {

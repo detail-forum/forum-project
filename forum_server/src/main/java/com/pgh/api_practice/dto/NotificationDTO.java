@@ -22,6 +22,7 @@ public class NotificationDTO {
     private String relatedUserProfileImageUrl;
     private Long relatedPostId;
     private Long relatedGroupPostId;
+    private Long relatedGroupId;  // 그룹 게시글의 그룹 ID
     private Long relatedCommentId;
     private boolean isRead;
     private LocalDateTime createdTime;

@@ -300,6 +300,7 @@ export interface NotificationDTO {
   relatedUserProfileImageUrl?: string
   relatedPostId?: number
   relatedGroupPostId?: number
+  relatedGroupId?: number  // 그룹 게시글의 그룹 ID
   relatedCommentId?: number
   isRead: boolean
   createdTime: string

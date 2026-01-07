@@ -11,6 +11,7 @@ import { getUsernameFromToken } from '@/utils/jwt'
 import { authApi, notificationApi } from '@/services/api'
 import { store } from '@/store/store'
 import type { User } from '@/types/api'
+import NotificationModal from './NotificationModal'
 
 interface HeaderProps {
   onLoginClick: () => void
@@ -21,6 +22,7 @@ export default function Header({ onLoginClick }: HeaderProps) {
   const [username, setUsername] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showNotificationModal, setShowNotificationModal] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const lastFetchedUsernameRef = useRef<string | null>(null) // 마지막으로 가져온 username 추적
@@ -189,10 +191,9 @@ export default function Header({ onLoginClick }: HeaderProps) {
                 >
                   채팅
                 </Link>
-                <Link
-                  href="/notifications"
+                <button
+                  onClick={() => setShowNotificationModal(true)}
                   className="relative text-gray-700 hover:text-primary transition-colors"
-                  prefetch={true}
                 >
                   <span className="sr-only">알림</span>
                   <svg
@@ -214,7 +215,7 @@ export default function Header({ onLoginClick }: HeaderProps) {
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
-                </Link>
+                </button>
                   </>
                 ) : (
                   <>
@@ -307,6 +308,15 @@ export default function Header({ onLoginClick }: HeaderProps) {
           </nav>
         </div>
       </div>
+      {showNotificationModal && (
+        <NotificationModal
+          isOpen={showNotificationModal}
+          onClose={() => {
+            setShowNotificationModal(false)
+            fetchUnreadCount() // 모달 닫을 때 알림 개수 갱신
+          }}
+        />
+      )}
     </header>
   )
 }
