@@ -25,4 +25,14 @@ public interface GroupPostRepository extends JpaRepository<GroupPost, Long> {
     @Modifying
     @Query("UPDATE GroupPost gp SET gp.views = gp.views + 1 WHERE gp.id = :id")
     void incrementViews(@Param("id") Long id);
+    
+    // 사용자 ID로 내가 작성한 모임 게시글 조회
+    @Query("SELECT gp FROM GroupPost gp WHERE gp.user.id = :userId AND gp.isDeleted = false ORDER BY gp.createdTime DESC")
+    Page<GroupPost> findByUserIdAndIsDeletedFalseOrderByCreatedTimeDesc(@Param("userId") Long userId, Pageable pageable);
+    
+    @Query("SELECT gp FROM GroupPost gp WHERE gp.user.id = :userId AND gp.isDeleted = false ORDER BY gp.views DESC")
+    Page<GroupPost> findByUserIdAndIsDeletedFalseOrderByViewsDesc(@Param("userId") Long userId, Pageable pageable);
+    
+    @Query("SELECT gp FROM GroupPost gp WHERE gp.user.id = :userId AND gp.isDeleted = false ORDER BY (SELECT COUNT(pl) FROM PostLike pl WHERE pl.groupPost.id = gp.id) DESC, gp.createdTime DESC")
+    Page<GroupPost> findByUserIdAndIsDeletedFalseOrderByLikesDesc(@Param("userId") Long userId, Pageable pageable);
 }

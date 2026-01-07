@@ -8,7 +8,7 @@ import type { RootState } from '@/store/store'
 import { logout } from '@/store/slices/authSlice'
 import { useRouter } from 'next/navigation'
 import { getUsernameFromToken } from '@/utils/jwt'
-import { authApi } from '@/services/api'
+import { authApi, notificationApi } from '@/services/api'
 import { store } from '@/store/store'
 import type { User } from '@/types/api'
 
@@ -21,6 +21,7 @@ export default function Header({ onLoginClick }: HeaderProps) {
   const [username, setUsername] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const lastFetchedUsernameRef = useRef<string | null>(null) // 마지막으로 가져온 username 추적
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
@@ -63,6 +64,19 @@ export default function Header({ onLoginClick }: HeaderProps) {
     }
   }, [])
 
+  const fetchUnreadCount = useCallback(async () => {
+    if (!isAuthenticated) return
+    try {
+      const response = await notificationApi.getUnreadCount()
+      if (response.success) {
+        setUnreadCount(response.data)
+      }
+    } catch (error) {
+      // 알림 개수 조회 실패는 조용히 무시
+      console.error('알림 개수 조회 실패:', error)
+    }
+  }, [isAuthenticated])
+
   // Hydration 에러 방지: 클라이언트에서만 마운트된 후 인증 상태 표시
   useEffect(() => {
     setMounted(true)
@@ -75,14 +89,25 @@ export default function Header({ onLoginClick }: HeaderProps) {
         lastFetchedUsernameRef.current = currentUsername
         fetchUserInfo()
       }
+      
+      // 알림 개수 조회
+      fetchUnreadCount()
+      
+      // 주기적으로 알림 개수 갱신 (30초마다)
+      const interval = setInterval(() => {
+        fetchUnreadCount()
+      }, 30000)
+      
+      return () => clearInterval(interval)
     } else {
       // 로그아웃 시 사용자 정보 초기화
       setUser(null)
       setUsername(null)
+      setUnreadCount(0)
       lastFetchedUsernameRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, fetchUserInfo])
+  }, [isAuthenticated, fetchUserInfo, fetchUnreadCount])
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -163,6 +188,32 @@ export default function Header({ onLoginClick }: HeaderProps) {
                   prefetch={true}
                 >
                   채팅
+                </Link>
+                <Link
+                  href="/notifications"
+                  className="relative text-gray-700 hover:text-primary transition-colors"
+                  prefetch={true}
+                >
+                  <span className="sr-only">알림</span>
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                    />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
                   </>
                 ) : (

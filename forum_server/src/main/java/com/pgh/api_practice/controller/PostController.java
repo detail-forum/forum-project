@@ -19,17 +19,18 @@ public class PostController {
     private final PostService postService;
 
     /** ✅ 내 게시글 목록 조회 */
-    // GET http://localhost:8081/post/my-post?sortType=RESENT&tag=react
+    // GET http://localhost:8081/post/my-post?sortType=RESENT&tag=react&groupFilter=ALL
     @GetMapping("/my-post")
     public ResponseEntity<ApiResponse<Page<PostListDTO>>> getMyPostList(
             Pageable pageable,
             @RequestParam(defaultValue = "RESENT") String sortType,
-            @RequestParam(required = false) String tag) {
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String groupFilter) {
         Page<PostListDTO> list;
         if (tag != null && !tag.trim().isEmpty()) {
-            list = postService.getMyPostListByTag(pageable, tag.trim().toLowerCase(), sortType);
+            list = postService.getMyPostListByTag(pageable, tag.trim().toLowerCase(), sortType, groupFilter);
         } else {
-            list = postService.getMyPostList(pageable, sortType);
+            list = postService.getMyPostList(pageable, sortType, groupFilter);
         }
         return ResponseEntity.ok(ApiResponse.ok(list, "내 게시글 조회 성공"));
     }

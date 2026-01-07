@@ -23,10 +23,19 @@ export default function MyPostsPage() {
   const [tag, setTag] = useState<string | null>(null)
   const [myTags, setMyTags] = useState<string[]>([])
   const [loadingTags, setLoadingTags] = useState(false)
+  const [groupFilter, setGroupFilter] = useState<'ALL' | 'GENERAL' | 'GROUP'>('ALL')
 
   useEffect(() => {
     const tagParam = searchParams.get('tag')
+    const groupFilterParam = searchParams.get('groupFilter') as 'ALL' | 'GENERAL' | 'GROUP' | null
+    const pageParam = searchParams.get('page')
     setTag(tagParam)
+    if (groupFilterParam && (groupFilterParam === 'ALL' || groupFilterParam === 'GENERAL' || groupFilterParam === 'GROUP')) {
+      setGroupFilter(groupFilterParam)
+    }
+    if (pageParam) {
+      setPage(parseInt(pageParam) - 1) // URL은 1부터 시작, 내부는 0부터
+    }
   }, [searchParams])
 
   useEffect(() => {
@@ -41,7 +50,7 @@ export default function MyPostsPage() {
       fetchPosts()
       fetchMyTags()
     }
-  }, [page, isAuthenticated, tag])
+  }, [page, isAuthenticated, tag, groupFilter])
 
   const fetchMyTags = async () => {
     try {
@@ -60,7 +69,7 @@ export default function MyPostsPage() {
   const fetchPosts = async () => {
     try {
       setLoading(true)
-      const response = await postApi.getMyPostList(page, 10, 'RESENT', tag || undefined)
+      const response = await postApi.getMyPostList(page, 10, 'RESENT', tag || undefined, groupFilter !== 'ALL' ? groupFilter : undefined)
       if (response.success && response.data) {
         setPosts(response.data.content || [])
         setTotalPages(response.data.totalPages || 0)
@@ -72,7 +81,15 @@ export default function MyPostsPage() {
     }
   }
 
-  const handleDelete = async (postId: number, e: React.MouseEvent) => {
+  const handleGroupFilterChange = (newFilter: 'ALL' | 'GENERAL' | 'GROUP') => {
+    setGroupFilter(newFilter)
+    setPage(0)
+    const tagParam = tag ? `&tag=${encodeURIComponent(tag)}` : ''
+    const groupFilterParam = newFilter !== 'ALL' ? `&groupFilter=${newFilter}` : ''
+    router.push(`/my-posts?page=1${tagParam}${groupFilterParam}`)
+  }
+
+  const handleDelete = async (postId: number, groupId: number | undefined, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     
@@ -81,9 +98,19 @@ export default function MyPostsPage() {
     }
 
     try {
-      const response = await postApi.deletePost(postId)
-      if (response.success) {
-        fetchPosts()
+      if (groupId) {
+        // 그룹 게시글 삭제
+        const { groupApi } = await import('@/services/api')
+        const response = await groupApi.deleteGroupPost(groupId, postId)
+        if (response.success) {
+          fetchPosts()
+        }
+      } else {
+        // 일반 게시글 삭제
+        const response = await postApi.deletePost(postId)
+        if (response.success) {
+          fetchPosts()
+        }
       }
     } catch (error: any) {
       alert(error.response?.data?.message || '게시글 삭제에 실패했습니다.')
@@ -143,13 +170,53 @@ export default function MyPostsPage() {
               {tag ? `#${tag} 태그가 포함된 ` : ''}작성한 게시글을 관리하세요
               {tag && (
                 <button
-                  onClick={() => router.push('/my-posts')}
+                  onClick={() => {
+                    const groupFilterParam = groupFilter !== 'ALL' ? `&groupFilter=${groupFilter}` : ''
+                    router.push(`/my-posts${groupFilterParam ? `?${groupFilterParam.substring(1)}` : ''}`)
+                  }}
                   className="ml-2 text-primary hover:underline"
                 >
-                  필터 제거
+                  태그 필터 제거
                 </button>
               )}
             </p>
+            
+            {/* 필터 UI */}
+            <div className="mb-6 flex items-center space-x-4 flex-wrap gap-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-gray-700">유형:</span>
+                <button
+                  onClick={() => handleGroupFilterChange('ALL')}
+                  className={`px-4 py-2 rounded-lg transition-colors text-sm ${
+                    groupFilter === 'ALL'
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  전체
+                </button>
+                <button
+                  onClick={() => handleGroupFilterChange('GENERAL')}
+                  className={`px-4 py-2 rounded-lg transition-colors text-sm ${
+                    groupFilter === 'GENERAL'
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  일반 게시글
+                </button>
+                <button
+                  onClick={() => handleGroupFilterChange('GROUP')}
+                  className={`px-4 py-2 rounded-lg transition-colors text-sm ${
+                    groupFilter === 'GROUP'
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  모임 게시글
+                </button>
+              </div>
+            </div>
             
             {/* 내가 사용한 태그 목록 */}
             {myTags.length > 0 && (
@@ -159,7 +226,10 @@ export default function MyPostsPage() {
                   {myTags.map((tagName) => (
                     <button
                       key={tagName}
-                      onClick={() => router.push(`/my-posts?tag=${encodeURIComponent(tagName)}`)}
+                      onClick={() => {
+                        const groupFilterParam = groupFilter !== 'ALL' ? `&groupFilter=${groupFilter}` : ''
+                        router.push(`/my-posts?tag=${encodeURIComponent(tagName)}${groupFilterParam}`)
+                      }}
                       className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                         tag === tagName
                           ? 'bg-primary text-white'
@@ -190,7 +260,11 @@ export default function MyPostsPage() {
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      router.push(`/posts/${post.id}/edit`)
+                      if (post.groupId) {
+                        router.push(`/social-gathering/${post.groupId}/posts/${post.id}/edit`)
+                      } else {
+                        router.push(`/posts/${post.id}/edit`)
+                      }
                     }}
                     className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-xs shadow-lg"
                   >
@@ -200,7 +274,7 @@ export default function MyPostsPage() {
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      handleDelete(post.id, e)
+                      handleDelete(post.id, post.groupId, e)
                     }}
                     className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs shadow-lg"
                   >
@@ -215,7 +289,13 @@ export default function MyPostsPage() {
         {totalPages > 1 && (
           <div className="flex justify-center mt-8 space-x-2">
             <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              onClick={() => {
+                const newPage = Math.max(0, page - 1)
+                setPage(newPage)
+                const tagParam = tag ? `&tag=${encodeURIComponent(tag)}` : ''
+                const groupFilterParam = groupFilter !== 'ALL' ? `&groupFilter=${groupFilter}` : ''
+                router.push(`/my-posts?page=${newPage + 1}${tagParam}${groupFilterParam}`)
+              }}
               disabled={page === 0}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
@@ -225,7 +305,13 @@ export default function MyPostsPage() {
               {page + 1} / {totalPages}
             </span>
             <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              onClick={() => {
+                const newPage = Math.min(totalPages - 1, page + 1)
+                setPage(newPage)
+                const tagParam = tag ? `&tag=${encodeURIComponent(tag)}` : ''
+                const groupFilterParam = groupFilter !== 'ALL' ? `&groupFilter=${groupFilter}` : ''
+                router.push(`/my-posts?page=${newPage + 1}${tagParam}${groupFilterParam}`)
+              }}
               disabled={page >= totalPages - 1}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >

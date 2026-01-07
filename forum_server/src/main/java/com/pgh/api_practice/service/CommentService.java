@@ -33,6 +33,7 @@ public class CommentService {
     private final PostRepository postRepository;
     private final GroupPostRepository groupPostRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     /**
      * 현재 인증된 사용자 정보 가져오기 (인증 필수)
@@ -163,6 +164,21 @@ public class CommentService {
         }
 
         Comment saved = commentRepository.save(commentBuilder.build());
+        
+        // 대댓글인 경우 알림 생성
+        if (parentComment != null) {
+            Long parentCommentAuthorId = parentComment.getUser().getId();
+            Long postIdValue = post != null ? post.getId() : groupPost.getId();
+            boolean isGroupPost = post == null;
+            notificationService.createCommentReplyNotification(
+                    parentCommentAuthorId, 
+                    currentUser.getId(), 
+                    postIdValue, 
+                    saved.getId(), 
+                    isGroupPost
+            );
+        }
+        
         return convertToDTO(saved, currentUser);
     }
 

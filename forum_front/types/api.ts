@@ -286,3 +286,21 @@ export interface CreateGroupChatMessageDTO {
   fileName?: string  // 파일명 (파일 타입일 때만)
   fileSize?: number  // 파일 크기 (바이트, 파일 타입일 때만)
 }
+
+// Notification 관련 타입
+export type NotificationType = 'ADMIN_NOTICE' | 'NEW_FOLLOWER' | 'NEW_MESSAGE' | 'POST_LIKE' | 'COMMENT_REPLY'
+
+export interface NotificationDTO {
+  id: number
+  type: NotificationType
+  title: string
+  message: string
+  relatedUserId?: number
+  relatedUserNickname?: string
+  relatedUserProfileImageUrl?: string
+  relatedPostId?: number
+  relatedGroupPostId?: number
+  relatedCommentId?: number
+  isRead: boolean
+  createdTime: string
+}

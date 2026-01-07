@@ -20,6 +20,7 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     /** ✅ 팔로우 */
     @Transactional
@@ -52,6 +53,9 @@ public class FollowService {
                 .following(following)
                 .build();
         followRepository.save(follow);
+        
+        // 알림 생성
+        notificationService.createNewFollowerNotification(followingId, follower.getId());
         
         return true; // 팔로우 성공
     }

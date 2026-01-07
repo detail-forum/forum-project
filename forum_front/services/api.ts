@@ -12,6 +12,7 @@ import type {
   CommentDTO,
   CreateCommentDTO,
   UpdateCommentDTO,
+  NotificationDTO,
 } from '@/types/api'
 import { cache } from '@/utils/cache'
 import { store } from '@/store/store'
@@ -303,10 +304,13 @@ export const postApi = {
     return response.data
   },
 
-  getMyPostList: async (page: number = 0, size: number = 10, sortType: string = 'RESENT', tag?: string): Promise<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>> => {
+  getMyPostList: async (page: number = 0, size: number = 10, sortType: string = 'RESENT', tag?: string, groupFilter?: string): Promise<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>> => {
     const params: any = { page, size, sortType }
     if (tag) {
       params.tag = tag
+    }
+    if (groupFilter) {
+      params.groupFilter = groupFilter
     }
     const response = await apiClient.get<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>>(
       '/post/my-post',
@@ -655,6 +659,32 @@ export const userPostApi = {
     const response = await apiClient.get<ApiResponse<{ content: PostListDTO[]; totalElements: number; totalPages: number }>>(`/post/group/${groupId}`, {
       params,
     })
+    return response.data
+  },
+}
+
+// Notification API
+export const notificationApi = {
+  getNotifications: async (page: number = 0, size: number = 20): Promise<ApiResponse<{ content: NotificationDTO[]; totalElements: number; totalPages: number; number: number; size: number }>> => {
+    const response = await apiClient.get<ApiResponse<{ content: NotificationDTO[]; totalElements: number; totalPages: number; number: number; size: number }>>(
+      '/notification',
+      { params: { page, size } }
+    )
+    return response.data
+  },
+
+  getUnreadCount: async (): Promise<ApiResponse<number>> => {
+    const response = await apiClient.get<ApiResponse<number>>('/notification/unread-count')
+    return response.data
+  },
+
+  markAllAsRead: async (): Promise<ApiResponse<void>> => {
+    const response = await apiClient.put<ApiResponse<void>>('/notification/read-all')
+    return response.data
+  },
+
+  markAsRead: async (notificationId: number): Promise<ApiResponse<void>> => {
+    const response = await apiClient.put<ApiResponse<void>>(`/notification/${notificationId}/read`)
     return response.data
   },
 }
