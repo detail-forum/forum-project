@@ -68,8 +68,20 @@ export default function SocialGatheringPage() {
     <div>
       <Header onLoginClick={() => {}} />
       {/* 배너 영역 */}
-      <div className="bg-gray-200 p-8 text-center">
-        <h1 className="text-2xl font-bold">마음이 맞는 사람들끼리 모여서 활동해봐요!</h1>
+      <div 
+        className="p-8 text-center relative"
+        style={{
+          backgroundImage: 'url(/asset/베너 배경 이미지.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+        <div className="relative z-10">
+          <h1 className="text-2xl font-bold text-white drop-shadow-lg">
+            마음이 맞는 사람들끼리 모여서 활동해봐요!
+          </h1>
+        </div>
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div>
