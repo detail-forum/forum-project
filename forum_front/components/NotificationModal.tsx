@@ -16,10 +16,14 @@ interface NotificationModalProps {
   onClose: () => void
 }
 
+type NotificationFilter = 'ALL' | 'POST_LIKE' | 'COMMENT_REPLY' | 'NEW_FOLLOWER' | 'NEW_MESSAGE' | 'ADMIN_NOTICE'
+
 export default function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
   const [notifications, setNotifications] = useState<NotificationDTO[]>([])
+  const [filteredNotifications, setFilteredNotifications] = useState<NotificationDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [filter, setFilter] = useState<NotificationFilter>('ALL')
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
   const router = useRouter()
   const modalRef = useRef<HTMLDivElement>(null)
@@ -57,17 +61,29 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
 
   const handleMarkAsRead = async (notificationId: number): Promise<void> => {
     try {
-      await notificationApi.markAsRead(notificationId)
-      // 상태는 이미 handleNotificationClick에서 업데이트했으므로 여기서는 확인만
-      setNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
-      )
-      setUnreadCount(prev => Math.max(0, prev - 1))
+      // 백엔드에서 업데이트된 알림 정보를 받아옴
+      const response = await notificationApi.markAsRead(notificationId)
+      if (response.success && response.data) {
+        // 서버에서 반환한 최신 상태로 업데이트
+        setNotifications(prev =>
+          prev.map(n => n.id === notificationId ? response.data : n)
+        )
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
     } catch (error) {
       console.error('알림 읽음 처리 실패:', error)
       throw error // 에러를 다시 throw하여 호출자가 처리할 수 있도록
     }
   }
+
+  // 필터 적용
+  useEffect(() => {
+    if (filter === 'ALL') {
+      setFilteredNotifications(notifications)
+    } else {
+      setFilteredNotifications(notifications.filter(n => n.type === filter))
+    }
+  }, [notifications, filter])
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -122,27 +138,30 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
   const handleNotificationClick = async (notification: NotificationDTO) => {
     // 읽지 않은 알림이면 먼저 읽음 처리
     if (!notification.isRead) {
-      // 즉시 UI 업데이트 (optimistic update)
-      setNotifications(prev =>
-        prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
-      )
-      setUnreadCount(prev => Math.max(0, prev - 1))
-      
-      // 백엔드에 읽음 처리 요청 (비동기로 처리)
-      handleMarkAsRead(notification.id).catch(error => {
-        // 실패 시 롤백
+      try {
+        // 백엔드에서 최신 상태를 받아와서 업데이트
+        await handleMarkAsRead(notification.id)
+      } catch (error) {
         console.error('알림 읽음 처리 실패:', error)
-        setNotifications(prev =>
-          prev.map(n => n.id === notification.id ? { ...n, isRead: false } : n)
-        )
-        setUnreadCount(prev => prev + 1)
-      })
+      }
     }
     
     const link = getNotificationLink(notification)
     if (link !== '#') {
       onClose()
       router.push(link)
+    }
+  }
+
+  const getFilterLabel = (filterType: NotificationFilter): string => {
+    switch (filterType) {
+      case 'ALL': return '전체'
+      case 'POST_LIKE': return '좋아요'
+      case 'COMMENT_REPLY': return '댓글'
+      case 'NEW_FOLLOWER': return '팔로워'
+      case 'NEW_MESSAGE': return '메시지'
+      case 'ADMIN_NOTICE': return '공지'
+      default: return '전체'
     }
   }
 
@@ -183,101 +202,117 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
         ref={modalRef}
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
       >
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-2xl font-bold text-gray-900">알림</h2>
-          <div className="flex items-center space-x-4">
-            {unreadCount > 0 && (
+        <div className="flex-shrink-0 border-b border-gray-200">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">알림</h2>
+            <div className="flex items-center space-x-4">
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="text-sm text-primary hover:text-secondary transition-colors"
+                >
+                  모두 읽음
+                </button>
+              )}
               <button
-                onClick={handleMarkAllAsRead}
-                className="text-sm text-primary hover:text-secondary transition-colors"
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
-                모두 읽음
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-            )}
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            </div>
+          </div>
+          {/* 필터 버튼 */}
+          <div className="px-6 pb-3 flex items-center space-x-2 overflow-x-auto">
+            {(['ALL', 'POST_LIKE', 'COMMENT_REPLY', 'NEW_FOLLOWER', 'NEW_MESSAGE', 'ADMIN_NOTICE'] as NotificationFilter[]).map((filterType) => (
+              <button
+                key={filterType}
+                onClick={() => setFilter(filterType)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
+                  filter === filterType
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {getFilterLabel(filterType)}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1">
+        <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
           {loading ? (
             <div className="px-6 py-12 text-center text-gray-500">
               알림을 불러오는 중...
             </div>
-          ) : notifications.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <div className="px-6 py-12 text-center text-gray-500">
-              알림이 없습니다.
+              {filter === 'ALL' ? '알림이 없습니다.' : `${getFilterLabel(filter)} 알림이 없습니다.`}
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {notifications.map((notification) => {
+              {filteredNotifications.map((notification) => {
                 return (
                   <div
                     key={notification.id}
-                    className={`px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer ${
+                    className={`px-6 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${
                       notification.isRead ? 'bg-white' : 'bg-blue-50'
                     }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 text-2xl">
-                        {getNotificationIcon(notification.type)}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start space-x-3 flex-1 min-w-0">
+                        <div className="flex-shrink-0 text-xl">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            {notification.title}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+                            {notification.message}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {notification.title}
-                            </p>
-                            <p className="mt-1 text-sm text-gray-600">
-                              {notification.message}
-                            </p>
-                            {notification.relatedUserNickname && (
-                              <div className="mt-2 flex items-center space-x-2">
-                                {notification.relatedUserProfileImageUrl ? (
-                                  <Image
-                                    src={
-                                      notification.relatedUserProfileImageUrl.startsWith('http')
-                                        ? notification.relatedUserProfileImageUrl
-                                        : `${process.env.NEXT_PUBLIC_UPLOAD_BASE_URL || ''}${notification.relatedUserProfileImageUrl}`
-                                    }
-                                    alt={notification.relatedUserNickname}
-                                    width={24}
-                                    height={24}
-                                    className="rounded-full object-cover"
-                                    unoptimized
-                                  />
-                                ) : (
-                                  <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center">
-                                    <span className="text-xs text-gray-600">
-                                      {notification.relatedUserNickname.charAt(0).toUpperCase()}
-                                    </span>
-                                  </div>
-                                )}
-                                <span className="text-xs text-gray-500">
-                                  {notification.relatedUserNickname}
+                      <div className="flex-shrink-0 flex flex-col items-end gap-2">
+                        {!notification.isRead && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        )}
+                        {notification.relatedUserNickname && (
+                          <div className="flex items-center space-x-1.5">
+                            {notification.relatedUserProfileImageUrl ? (
+                              <Image
+                                src={
+                                  notification.relatedUserProfileImageUrl.startsWith('http')
+                                    ? notification.relatedUserProfileImageUrl
+                                    : `${process.env.NEXT_PUBLIC_UPLOAD_BASE_URL || ''}${notification.relatedUserProfileImageUrl}`
+                                }
+                                alt={notification.relatedUserNickname}
+                                width={20}
+                                height={20}
+                                className="rounded-full object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center">
+                                <span className="text-xs text-gray-600">
+                                  {notification.relatedUserNickname.charAt(0).toUpperCase()}
                                 </span>
                               </div>
                             )}
-                            <p className="mt-2 text-xs text-gray-400">
-                              {formatDistanceToNow(new Date(notification.createdTime), {
-                                addSuffix: true,
-                                locale: ko,
-                              })}
-                            </p>
+                            <span className="text-xs text-gray-500 max-w-[80px] truncate">
+                              {notification.relatedUserNickname}
+                            </span>
                           </div>
-                          {!notification.isRead && (
-                            <div className="ml-4 flex-shrink-0">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            </div>
-                          )}
-                        </div>
+                        )}
+                        <p className="text-xs text-gray-400 whitespace-nowrap">
+                          {formatDistanceToNow(new Date(notification.createdTime), {
+                            addSuffix: true,
+                            locale: ko,
+                          })}
+                        </p>
                       </div>
                     </div>
                   </div>

@@ -228,7 +228,7 @@ public class NotificationService {
      * 특정 알림을 읽음 처리
      */
     @Transactional
-    public void markAsRead(Long notificationId) {
+    public NotificationDTO markAsRead(Long notificationId) {
         Users currentUser = getCurrentUser();
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("알림을 찾을 수 없습니다."));
@@ -239,6 +239,28 @@ public class NotificationService {
         }
         
         notificationRepository.markAsRead(notificationId);
+        
+        // 업데이트된 알림을 다시 조회하여 DTO로 변환하여 반환
+        Notification updatedNotification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("알림을 찾을 수 없습니다."));
+        return convertToDTO(updatedNotification);
+    }
+
+    /**
+     * 특정 알림의 읽음 상태 확인
+     */
+    @Transactional(readOnly = true)
+    public boolean getReadStatus(Long notificationId) {
+        Users currentUser = getCurrentUser();
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("알림을 찾을 수 없습니다."));
+        
+        // 본인의 알림만 확인 가능
+        if (!notification.getUser().getId().equals(currentUser.getId())) {
+            throw new ApplicationUnauthorizedException("본인의 알림만 확인할 수 있습니다.");
+        }
+        
+        return notification.isRead();
     }
 
     /**

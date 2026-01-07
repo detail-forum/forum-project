@@ -704,8 +704,13 @@ export const notificationApi = {
     return response.data
   },
 
-  markAsRead: async (notificationId: number): Promise<ApiResponse<void>> => {
-    const response = await apiClient.put<ApiResponse<void>>(`/notification/${notificationId}/read`)
+  markAsRead: async (notificationId: number): Promise<ApiResponse<NotificationDTO>> => {
+    const response = await apiClient.put<ApiResponse<NotificationDTO>>(`/notification/${notificationId}/read`)
+    return response.data
+  },
+
+  getReadStatus: async (notificationId: number): Promise<ApiResponse<boolean>> => {
+    const response = await apiClient.get<ApiResponse<boolean>>(`/notification/${notificationId}/read-status`)
     return response.data
   },
 }

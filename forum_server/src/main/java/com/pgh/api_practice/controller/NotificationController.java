@@ -47,8 +47,17 @@ public class NotificationController {
      * 특정 알림을 읽음 처리
      */
     @PutMapping("/{id}/read")
-    public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable Long id) {
-        notificationService.markAsRead(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "알림을 읽음 처리했습니다."));
+    public ResponseEntity<ApiResponse<NotificationDTO>> markAsRead(@PathVariable Long id) {
+        NotificationDTO notification = notificationService.markAsRead(id);
+        return ResponseEntity.ok(ApiResponse.ok(notification, "알림을 읽음 처리했습니다."));
+    }
+
+    /**
+     * 특정 알림의 읽음 상태 확인
+     */
+    @GetMapping("/{id}/read-status")
+    public ResponseEntity<ApiResponse<Boolean>> getReadStatus(@PathVariable Long id) {
+        boolean isRead = notificationService.getReadStatus(id);
+        return ResponseEntity.ok(ApiResponse.ok(isRead, "알림 읽음 상태 조회 성공"));
     }
 }
