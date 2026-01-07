@@ -90,8 +90,16 @@ apiClient.interceptors.response.use(
       console.error('Error:', error.message)
     }
 
+    // 인증 확인 API는 인터셉터에서 제외 (무한 루프 방지)
+    const isAuthCheckEndpoint = originalRequest?.url?.includes('/auth/verify') || 
+                                 originalRequest?.url?.includes('/auth/me')
+
     // 401 또는 403 에러 처리 - 토큰 재발급 시도 (403도 인증 문제일 수 있음)
-    if ((error.response?.status === 401 || error.response?.status === 403) && typeof window !== 'undefined' && originalRequest && !originalRequest._retry) {
+    if ((error.response?.status === 401 || error.response?.status === 403) && 
+        typeof window !== 'undefined' && 
+        originalRequest && 
+        !originalRequest._retry &&
+        !isAuthCheckEndpoint) { // 인증 확인 API는 제외
       if (isRefreshing) {
         // 이미 재발급 중이면 대기열에 추가
         return new Promise((resolve, reject) => {
@@ -116,7 +124,7 @@ apiClient.interceptors.response.use(
       const refreshToken = state.auth.refreshToken
 
       if (!refreshToken) {
-        // RefreshToken이 없으면 로그아웃
+        // RefreshToken이 없으면 로그아웃 (인증 확인 API가 아닌 경우에만)
         processQueue(error)
         isRefreshing = false
         removeCookie('accessToken')
@@ -134,7 +142,11 @@ apiClient.interceptors.response.use(
         }
         console.warn('인증 실패:', errorMessage)
 
-        window.location.href = '/'
+        // 인증 확인 API가 아닌 경우에만 리다이렉트 (무한 루프 방지)
+        // 현재 경로가 홈이 아닌 경우에만 리다이렉트
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.location.href = '/'
+        }
         return Promise.reject(error)
       }
       
@@ -147,7 +159,10 @@ apiClient.interceptors.response.use(
         store.dispatch(logout())
         
         console.warn('RefreshToken이 만료되었습니다. 다시 로그인해주세요.')
-        window.location.href = '/'
+        // 현재 경로가 홈이 아닌 경우에만 리다이렉트 (무한 루프 방지)
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.location.href = '/'
+        }
         return Promise.reject(error)
       }
 
