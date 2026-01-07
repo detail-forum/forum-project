@@ -31,8 +31,7 @@ public class GroupController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<GroupListDTO>>> getGroupList(
             Pageable pageable,
-            @RequestParam(required = false) Boolean myGroups
-    ) {
+            @RequestParam(required = false) Boolean myGroups) {
         Page<GroupListDTO> list = groupService.getGroupList(pageable, myGroups);
         return ResponseEntity.ok(ApiResponse.ok(list, "모임 목록 조회 성공"));
     }
@@ -106,8 +105,7 @@ public class GroupController {
     @DeleteMapping("/{groupId}")
     public ResponseEntity<ApiResponse<Void>> deleteGroup(
             @PathVariable Long groupId,
-            @RequestParam(required = false) String groupName
-    ) {
+            @RequestParam(required = false) String groupName) {
         groupService.deleteGroup(groupId, groupName);
         return ResponseEntity.ok(ApiResponse.ok("모임이 삭제되었습니다."));
     }
