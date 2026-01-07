@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -331,11 +332,18 @@ public class GroupController {
     )
     @GetMapping("/{groupId}/posts")
     public ResponseEntity<ApiResponse<Page<GroupPostListDTO>>> getGroupPostList(
-            @Parameter(description = "모임 ID", required = true, example = "1")
             @PathVariable Long groupId,
             Pageable pageable
     ) {
-        Page<GroupPostListDTO> list = groupPostService.getGroupPostList(groupId, pageable);
+        Pageable safePageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize()
+                // sort 제거 (중요)
+        );
+
+        Page<GroupPostListDTO> list =
+                groupPostService.getGroupPostList(groupId, safePageable);
+
         return ResponseEntity.ok(ApiResponse.ok(list, "모임 활동 게시물 목록 조회 성공"));
     }
 
