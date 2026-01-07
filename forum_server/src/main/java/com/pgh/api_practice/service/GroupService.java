@@ -48,9 +48,10 @@ public class GroupService {
             throw new GroupException(GroupErrorCode.UNAUTHORIZED);
         }
 
-        long owned = groupRepository.countByOwnerId(user.getId());
-        long joined = groupMemberRepository.findByUserId(user.getId()).size();
-        if (owned + joined >= 10) {
+        long joinedGroupCount =
+                groupMemberRepository.countDistinctGroupByUserId(user.getId());
+
+        if (joinedGroupCount >= 10) {
             throw new GroupException(GroupErrorCode.GROUP_LIMIT_EXCEEDED);
         }
 
@@ -63,6 +64,7 @@ public class GroupService {
                         .build()
         );
 
+        // owner = member + admin (필수)
         groupMemberRepository.save(
                 GroupMember.builder()
                         .group(group)
@@ -71,7 +73,7 @@ public class GroupService {
                         .build()
         );
 
-        // 기본 채팅방 2개 생성
+        // 관리자 채팅방
         groupChatRoomRepository.save(
                 GroupChatRoom.builder()
                         .group(group)
@@ -81,6 +83,7 @@ public class GroupService {
                         .build()
         );
 
+        // 일반 채팅방
         groupChatRoomRepository.save(
                 GroupChatRoom.builder()
                         .group(group)
@@ -120,16 +123,41 @@ public class GroupService {
      * ========================= */
     @Transactional(readOnly = true)
     public GroupDetailDTO getGroupDetail(Long groupId) {
+
+        Users user = getCurrentUser(); // 로그인 안 했으면 null 가능
+        Long userId = (user != null) ? user.getId() : null;
+
         Group group = groupRepository.findByIdAndIsDeletedFalse(groupId)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
 
-        return GroupDetailDTO.builder()
+        // 1. 멤버 수
+        long memberCount =
+                groupMemberRepository.countByGroupId(groupId);
+
+        // 2. 멤버 여부
+        boolean isMember = userId != null &&
+                groupMemberRepository.existsByGroupIdAndUserId(groupId, userId);
+
+        // 3. 관리자 여부 (owner 기준)
+        boolean isAdmin = userId != null &&
+                group.getOwner().getId().equals(userId);
+
+        GroupDetailDTO dto = GroupDetailDTO.builder()
                 .id(group.getId())
                 .name(group.getName())
                 .description(group.getDescription())
-                .profileImageUrl(group.getProfileImageUrl())
                 .ownerUsername(group.getOwner().getUsername())
+                .ownerNickname(group.getOwner().getNickname())
+                .profileImageUrl(group.getProfileImageUrl())
+                .memberCount(memberCount)
+                .createdTime(group.getCreatedTime())   // ← 핵심
+                .updatedTime(group.getUpdatedTime())   // ← 핵심
+                .isMember(isMember)
+                .isAdmin(isAdmin)
                 .build();
+
+
+        return dto;
     }
 
     /* =========================
