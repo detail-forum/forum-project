@@ -49,7 +49,7 @@ pipeline {
                         Write-Host ""
                         
                         Write-Host "Installing dependencies..." -ForegroundColor Yellow
-                        npm ci
+                        npm ci --legacy-peer-deps
                         if ($LASTEXITCODE -ne 0) {
                             Write-Host "[ERROR] npm ci failed!" -ForegroundColor Red
                             exit 1
@@ -180,6 +180,7 @@ stage('Copy Artifacts') {
             if exist forum_front\\tsconfig.json copy /Y forum_front\\tsconfig.json "%DEPLOY_FRONTEND%\\tsconfig.json"
             if exist forum_front\\tailwind.config.js copy /Y forum_front\\tailwind.config.js "%DEPLOY_FRONTEND%\\tailwind.config.js"
             if exist forum_front\\postcss.config.js copy /Y forum_front\\postcss.config.js "%DEPLOY_FRONTEND%\\postcss.config.js"
+            if exist forum_front\\webpack-fallbacks xcopy /E /I /Y forum_front\\webpack-fallbacks "%DEPLOY_FRONTEND%\\webpack-fallbacks"
 
             echo Copying source directories...
             xcopy /E /I /Y forum_front\\app "%DEPLOY_FRONTEND%\\app"

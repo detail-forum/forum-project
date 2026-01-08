@@ -1,45 +1,121 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { SplitText, FadeContent, Bounce } from '@appletosolutions/reactbits'
+import { motion } from 'framer-motion'
+
+// 텍스트를 문자 단위로 분할하여 애니메이션하는 컴포넌트
+function SplitText({ text, delay = 0, className = '' }: { text: string; delay?: number; className?: string }) {
+  const chars = text.split('')
+  
+  return (
+    <span className={className}>
+      {chars.map((char, index) => (
+        <motion.span
+          key={index}
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.5,
+            delay: delay + index * 0.05,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          style={{ display: 'inline-block' }}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </motion.span>
+      ))}
+    </span>
+  )
+}
+
+// 페이드 인 애니메이션 컴포넌트
+function FadeContent({ children, delay = 0, duration = 1 }: { children: React.ReactNode; delay?: number; duration?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration,
+        delay,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+// 바운스 애니메이션 컴포넌트
+function Bounce({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{
+        duration: 0.5,
+        delay: 0.7,
+        type: 'spring',
+        stiffness: 200,
+        damping: 10,
+      }}
+      whileHover={{ scale: 1.05 }}
+    >
+      {children}
+    </motion.div>
+  )
+}
 
 export default function Hero() {
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    setIsVisible(true)
-  }, [])
-
   return (
     <section className="bg-gradient-to-br from-primary/10 via-white to-secondary/10 py-20 relative overflow-hidden">
       {/* 배경 애니메이션 효과 */}
       <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 left-1/4 w-72 h-72 bg-primary rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-        <div className="absolute top-0 right-1/4 w-72 h-72 bg-secondary rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
-        <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-primary rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
+        <motion.div
+          className="absolute top-0 left-1/4 w-72 h-72 bg-primary rounded-full mix-blend-multiply filter blur-xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.2, 0.3, 0.2],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+        <motion.div
+          className="absolute top-0 right-1/4 w-72 h-72 bg-secondary rounded-full mix-blend-multiply filter blur-xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.2, 0.3, 0.2],
+          }}
+          transition={{
+            duration: 4,
+            delay: 0.7,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+        <motion.div
+          className="absolute -bottom-8 left-1/2 w-72 h-72 bg-primary rounded-full mix-blend-multiply filter blur-xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.2, 0.3, 0.2],
+          }}
+          transition={{
+            duration: 4,
+            delay: 1,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            <SplitText
-              text="개발자들을 위한"
-              duration={0.8}
-              delay={0.1}
-              from={{ opacity: 0, y: 50 }}
-              to={{ opacity: 1, y: 0 }}
-              splitType="chars"
-            />
+            <SplitText text="개발자들을 위한" delay={0.1} />
             <br />
             <span className="text-primary">
-              <SplitText
-                text="SNS 서비스"
-                duration={0.8}
-                delay={0.5}
-                from={{ opacity: 0, y: 50 }}
-                to={{ opacity: 1, y: 0 }}
-                splitType="chars"
-              />
+              <SplitText text="SNS 서비스" delay={0.5} />
             </span>
           </h1>
           

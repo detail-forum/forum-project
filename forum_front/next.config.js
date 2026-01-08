@@ -27,6 +27,17 @@ const nextConfig = {
   async headers() {
     return []
   },
+  webpack: (config, { isServer }) => {
+    // 클라이언트 사이드에서만 처리
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      }
+    }
+    
+    return config
+  },
 }
 
 module.exports = nextConfig

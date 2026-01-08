@@ -6,7 +6,40 @@ import type { PostListDTO } from '@/types/api'
 import Link from 'next/link'
 import PostCard from './PostCard'
 import { PostListSkeleton } from './SkeletonLoader'
-import { ScrollReveal, FadeContent } from '@appletosolutions/reactbits'
+import { motion } from 'framer-motion'
+
+// ScrollReveal 컴포넌트 (framer-motion으로 구현)
+function ScrollReveal({ children, enableBlur = true }: { children: React.ReactNode; enableBlur?: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-100px' }}
+      transition={{
+        duration: 0.6,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+// FadeContent 컴포넌트 (framer-motion으로 구현)
+function FadeContent({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{
+        duration: 0.6,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  )
+}
 
 export default function RecentPosts() {
   const [posts, setPosts] = useState<PostListDTO[]>([])
