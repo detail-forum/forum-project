@@ -45,6 +45,7 @@ public interface DirectChatMessageRepository
                 :lastReadMessageId is null
                 or m.id > :lastReadMessageId
           )
+          and m.isDeleted = false
     """)
     long countUnreadMessages(
             @Param("room") DirectChatRoom room,

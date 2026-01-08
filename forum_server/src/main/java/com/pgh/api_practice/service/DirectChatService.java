@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -68,10 +69,24 @@ public class DirectChatService {
     public List<DirectChatRoomDTO> getMyRooms() {
         Users me = getCurrentUser();
 
-        return roomRepository.findMyRooms(me.getId())
-                .stream()
-                .map(room -> toRoomDTO(room, me.getId()))
-                .toList();
+        try {
+            return roomRepository.findMyRooms(me.getId())
+                    .stream()
+                    .map(room -> {
+                        try {
+                            return toRoomDTO(room, me.getId());
+                        } catch (Exception e) {
+                            // 개별 채팅방 변환 실패 시 로그만 남기고 건너뛰기
+                            log.error("채팅방 변환 실패 (roomId: {}): {}", room.getId(), e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(dto -> dto != null)
+                    .toList();
+        } catch (Exception e) {
+            log.error("1대1 채팅방 목록 조회 실패: {}", e.getMessage(), e);
+            throw new RuntimeException("채팅방 목록을 조회하는 중 오류가 발생했습니다.", e);
+        }
     }
 
     /* =========================

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store/store'
 import Header from '@/components/Header'
@@ -9,7 +9,7 @@ import LoginModal from '@/components/LoginModal'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { getUsernameFromToken } from '@/utils/jwt'
-import { directChatApi, groupApi, imageUploadApi, fileUploadApi } from '@/services/api'
+import { directChatApi, groupApi, imageUploadApi, fileUploadApi, followApi } from '@/services/api'
 import type { DirectChatRoomDTO, DirectChatMessageDTO, GroupChatRoomDTO, GroupChatMessageDTO } from '@/types/api'
 
 // 확장된 그룹 채팅방 타입 (그룹 정보 포함)
@@ -31,6 +31,7 @@ type ChatTab = 'direct' | 'group'
 
 export default function ChatPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated)
   const [currentTab, setCurrentTab] = useState<ChatTab>('direct')
   const [currentUsername, setCurrentUsername] = useState<string | null>(null)
@@ -85,6 +86,55 @@ export default function ChatPage() {
     }
   }, [isAuthenticated, currentUsername, currentTab])
 
+  // 쿼리 파라미터로 사용자 지정 시 채팅방 생성/선택
+  useEffect(() => {
+    const targetUsername = searchParams.get('user')
+    if (targetUsername && isAuthenticated && currentUsername && currentTab === 'direct') {
+      handleStartChatWithUser(targetUsername)
+    }
+  }, [searchParams, isAuthenticated, currentUsername, currentTab])
+
+  // 특정 사용자와 채팅 시작
+  const handleStartChatWithUser = async (targetUsername: string) => {
+    try {
+      // 자기 자신과는 채팅 불가
+      if (targetUsername === currentUsername) {
+        console.warn('자기 자신과는 채팅할 수 없습니다.')
+        return
+      }
+
+      // 사용자 정보 조회
+      const userInfoResponse = await followApi.getUserInfo(targetUsername)
+      if (!userInfoResponse.success || !userInfoResponse.data?.id) {
+        console.error('사용자 정보를 찾을 수 없습니다:', targetUsername)
+        alert('사용자를 찾을 수 없습니다.')
+        router.replace('/chat')
+        return
+      }
+
+      const targetUserId = userInfoResponse.data.id
+
+      // 채팅방 생성 또는 조회
+      const roomResponse = await directChatApi.getOrCreateRoom(targetUserId)
+      if (roomResponse.success && roomResponse.data) {
+        // 채팅방 목록 새로고침
+        await fetchDirectChatRooms()
+        // 생성된/조회된 채팅방 선택
+        setSelectedDirectChat(roomResponse.data.id)
+        // 쿼리 파라미터 제거
+        router.replace('/chat')
+      } else {
+        console.error('채팅방 생성/조회 실패:', roomResponse.message)
+        alert(roomResponse.message || '채팅방을 생성할 수 없습니다.')
+      }
+    } catch (error: any) {
+      console.error('채팅 시작 실패:', error)
+      const errorMessage = error.response?.data?.message || error.message || '채팅을 시작할 수 없습니다.'
+      alert(errorMessage)
+      router.replace('/chat')
+    }
+  }
+
 
   // 선택된 채팅방의 메시지 로드
   useEffect(() => {
@@ -114,9 +164,13 @@ export default function ChatPage() {
       const response = await directChatApi.getMyRooms()
       if (response.success && response.data) {
         setDirectChatRooms(response.data)
+      } else {
+        console.error('1대1 채팅방 목록 조회 실패:', response.message)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('1대1 채팅방 목록 조회 실패:', error)
+      const errorMessage = error.response?.data?.message || error.message || '채팅방 목록을 불러올 수 없습니다.'
+      console.error('에러 상세:', errorMessage)
     } finally {
       setLoading(false)
     }
