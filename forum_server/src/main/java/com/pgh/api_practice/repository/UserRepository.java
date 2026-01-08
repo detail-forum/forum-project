@@ -10,11 +10,11 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<Users, Long> {
     /** username으로 사용자 조회 (중복 시 첫 번째 결과만 반환) */
-    @Query("SELECT u FROM Users u WHERE u.username = :username AND u.isDeleted = false ORDER BY u.id ASC")
-    List<Users> findAllByUsername(@Param("username") String username);
+    @Query(value = "SELECT * FROM users WHERE username = :username AND is_deleted = false ORDER BY id ASC LIMIT 1", nativeQuery = true)
+    Optional<Users> findFirstByUsernameNative(@Param("username") String username);
     
+    /** username으로 사용자 조회 (기존 메서드와 호환성을 위해 유지) */
     default Optional<Users> findByUsername(String username) {
-        List<Users> users = findAllByUsername(username);
-        return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+        return findFirstByUsernameNative(username);
     }
 }

@@ -151,6 +151,13 @@ public class GlobalApiResponseHandler {
         return ResponseEntity.status(404).body(ApiResponse.fail("요청한 리소스를 찾을 수 없습니다: " + resourcePath));
     }
 
+    // NonUniqueResultException 처리 (JPA 쿼리에서 여러 결과 반환 시)
+    @ExceptionHandler(org.hibernate.NonUniqueResultException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNonUniqueResultException(org.hibernate.NonUniqueResultException ex) {
+        ex.printStackTrace();
+        return ResponseEntity.status(500).body(ApiResponse.fail("데이터 중복 오류가 발생했습니다. 관리자에게 문의해주세요."));
+    }
+
     // 500: RuntimeException 처리
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Void>> handleRuntimeException(RuntimeException ex) {
@@ -158,6 +165,10 @@ public class GlobalApiResponseHandler {
         // ResourceNotFoundException은 이미 처리되므로 여기서는 제외
         if (ex instanceof ResourceNotFoundException) {
             return ResponseEntity.status(404).body(ApiResponse.fail(ex.getMessage()));
+        }
+        // NonUniqueResultException도 이미 처리되므로 여기서는 제외
+        if (ex instanceof org.hibernate.NonUniqueResultException) {
+            return ResponseEntity.status(500).body(ApiResponse.fail("데이터 중복 오류가 발생했습니다. 관리자에게 문의해주세요."));
         }
         return ResponseEntity.status(500).body(ApiResponse.fail("서버 내부 오류가 발생했습니다: " + ex.getMessage()));
     }
