@@ -68,25 +68,36 @@ public class DirectChatService {
 
     /** 내 1대1 채팅방 목록 조회 */
     public List<DirectChatRoomDTO> getMyRooms() {
-        Users me = getCurrentUser();
-
         try {
-            return roomRepository.findMyRooms(me.getId())
-                    .stream()
+            Users me = getCurrentUser();
+            if (me == null) {
+                log.error("현재 사용자를 찾을 수 없습니다.");
+                throw new ResourceNotFoundException("인증이 필요합니다.");
+            }
+
+            List<DirectChatRoom> rooms = roomRepository.findMyRooms(me.getId());
+            if (rooms == null || rooms.isEmpty()) {
+                return List.of();
+            }
+
+            return rooms.stream()
                     .map(room -> {
                         try {
                             return toRoomDTO(room, me.getId());
                         } catch (Exception e) {
                             // 개별 채팅방 변환 실패 시 로그만 남기고 건너뛰기
-                            log.error("채팅방 변환 실패 (roomId: {}): {}", room.getId(), e.getMessage());
+                            log.error("채팅방 변환 실패 (roomId: {}): {}", room.getId(), e.getMessage(), e);
                             return null;
                         }
                     })
                     .filter(dto -> dto != null)
                     .toList();
+        } catch (ResourceNotFoundException e) {
+            log.error("1대1 채팅방 목록 조회 실패 (인증 오류): {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("1대1 채팅방 목록 조회 실패: {}", e.getMessage(), e);
-            throw new RuntimeException("채팅방 목록을 조회하는 중 오류가 발생했습니다.", e);
+            throw new RuntimeException("채팅방 목록을 조회하는 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
     }
 
@@ -131,16 +142,30 @@ public class DirectChatService {
     }
 
     private Users getCurrentUser() {
-        String username = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName();
+        try {
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null) {
+                log.error("SecurityContext에 인증 정보가 없습니다.");
+                throw new ResourceNotFoundException("인증이 필요합니다.");
+            }
 
-        if (username == null || "anonymousUser".equals(username)) {
-            throw new ResourceNotFoundException("인증이 필요합니다.");
+            String username = authentication.getName();
+            if (username == null || "anonymousUser".equals(username)) {
+                log.error("인증되지 않은 사용자입니다. username: {}", username);
+                throw new ResourceNotFoundException("인증이 필요합니다.");
+            }
+
+            return userRepository.findByUsername(username)
+                    .orElseThrow(() -> {
+                        log.error("인증 사용자 정보를 찾을 수 없습니다: {}", username);
+                        return new ResourceNotFoundException("인증 사용자 정보를 찾을 수 없습니다: " + username);
+                    });
+        } catch (ResourceNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("getCurrentUser 실패: {}", e.getMessage(), e);
+            throw new ResourceNotFoundException("인증 정보를 확인할 수 없습니다.");
         }
-
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("인증 사용자 정보를 찾을 수 없습니다: " + username));
     }
 
     @Transactional

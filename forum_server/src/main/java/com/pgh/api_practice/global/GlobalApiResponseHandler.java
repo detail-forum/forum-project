@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -128,5 +129,23 @@ public class GlobalApiResponseHandler {
     @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthenticationCredentialsNotFound(AuthenticationCredentialsNotFoundException ex) {
         return ResponseEntity.status(401).body(ApiResponse.fail("인증 정보가 없습니다."));
+    }
+
+    // 404: 핸들러를 찾을 수 없음 (NoHandlerFoundException)
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoHandlerFound(NoHandlerFoundException ex) {
+        ex.printStackTrace();
+        return ResponseEntity.status(404).body(ApiResponse.fail("요청한 경로를 찾을 수 없습니다: " + ex.getRequestURL()));
+    }
+
+    // 500: RuntimeException 처리
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRuntimeException(RuntimeException ex) {
+        ex.printStackTrace();
+        // ResourceNotFoundException은 이미 처리되므로 여기서는 제외
+        if (ex instanceof ResourceNotFoundException) {
+            return ResponseEntity.status(404).body(ApiResponse.fail(ex.getMessage()));
+        }
+        return ResponseEntity.status(500).body(ApiResponse.fail("서버 내부 오류가 발생했습니다: " + ex.getMessage()));
     }
 }
