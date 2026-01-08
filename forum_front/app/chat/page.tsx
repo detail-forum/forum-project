@@ -212,27 +212,36 @@ export default function ChatPage() {
       setSending(true)
       if (currentTab === 'direct' && selectedDirectChat) {
         const response = await directChatApi.sendMessage(selectedDirectChat, {
-          message: newMessage,
-          messageType: 'TEXT',
+          message: newMessage.trim(),
+          messageType: 'TEXT' as const,
         })
         if (response.success && response.data) {
           // 메시지 목록 새로고침
           await fetchDirectMessages(selectedDirectChat)
+          setNewMessage('')
+        } else {
+          console.error('메시지 전송 실패:', response.message)
+          alert(response.message || '메시지 전송에 실패했습니다.')
         }
       } else if (currentTab === 'group' && selectedGroupChat) {
         const response = await groupApi.sendChatMessage(
           selectedGroupChat.groupId,
           selectedGroupChat.roomId,
-          { message: newMessage }
+          { message: newMessage.trim() }
         )
         if (response.success) {
           // 메시지 목록 새로고침
           await fetchGroupMessages(selectedGroupChat.groupId, selectedGroupChat.roomId)
+          setNewMessage('')
+        } else {
+          console.error('메시지 전송 실패:', response.message)
+          alert(response.message || '메시지 전송에 실패했습니다.')
         }
       }
-      setNewMessage('')
-    } catch (error) {
+    } catch (error: any) {
       console.error('메시지 전송 실패:', error)
+      const errorMessage = error.response?.data?.message || error.message || '메시지 전송에 실패했습니다.'
+      alert(errorMessage)
     } finally {
       setSending(false)
     }
@@ -247,11 +256,14 @@ export default function ChatPage() {
         if (currentTab === 'direct' && selectedDirectChat) {
           const response = await directChatApi.sendMessage(selectedDirectChat, {
             message: '',
-            messageType: 'IMAGE',
+            messageType: 'IMAGE' as const,
             fileUrl: uploadResponse.data.url,
           })
-          if (response.success) {
+          if (response.success && response.data) {
             await fetchDirectMessages(selectedDirectChat)
+          } else {
+            console.error('이미지 메시지 전송 실패:', response.message)
+            alert(response.message || '이미지 전송에 실패했습니다.')
           }
         } else if (currentTab === 'group' && selectedGroupChat) {
           const response = await groupApi.sendChatMessage(
@@ -265,11 +277,19 @@ export default function ChatPage() {
           )
           if (response.success) {
             await fetchGroupMessages(selectedGroupChat.groupId, selectedGroupChat.roomId)
+          } else {
+            console.error('이미지 메시지 전송 실패:', response.message)
+            alert(response.message || '이미지 전송에 실패했습니다.')
           }
         }
+      } else {
+        console.error('이미지 업로드 실패:', uploadResponse.message)
+        alert(uploadResponse.message || '이미지 업로드에 실패했습니다.')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('이미지 업로드 실패:', error)
+      const errorMessage = error.response?.data?.message || error.message || '이미지 업로드에 실패했습니다.'
+      alert(errorMessage)
     } finally {
       setSending(false)
     }
@@ -284,13 +304,16 @@ export default function ChatPage() {
         if (currentTab === 'direct' && selectedDirectChat) {
           const response = await directChatApi.sendMessage(selectedDirectChat, {
             message: '',
-            messageType: 'FILE',
+            messageType: 'FILE' as const,
             fileUrl: uploadResponse.data.url,
             fileName: file.name,
             fileSize: file.size,
           })
-          if (response.success) {
+          if (response.success && response.data) {
             await fetchDirectMessages(selectedDirectChat)
+          } else {
+            console.error('파일 메시지 전송 실패:', response.message)
+            alert(response.message || '파일 전송에 실패했습니다.')
           }
         } else if (currentTab === 'group' && selectedGroupChat) {
           const response = await groupApi.sendChatMessage(
@@ -306,11 +329,19 @@ export default function ChatPage() {
           )
           if (response.success) {
             await fetchGroupMessages(selectedGroupChat.groupId, selectedGroupChat.roomId)
+          } else {
+            console.error('파일 메시지 전송 실패:', response.message)
+            alert(response.message || '파일 전송에 실패했습니다.')
           }
         }
+      } else {
+        console.error('파일 업로드 실패:', uploadResponse.message)
+        alert(uploadResponse.message || '파일 업로드에 실패했습니다.')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('파일 업로드 실패:', error)
+      const errorMessage = error.response?.data?.message || error.message || '파일 업로드에 실패했습니다.'
+      alert(errorMessage)
     } finally {
       setSending(false)
     }

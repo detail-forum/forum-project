@@ -37,6 +37,12 @@ public class DirectChatRoom {
     private LocalDateTime updatedTime;
 
     public DirectChatRoom(Long userA, Long userB) {
+        if (userA == null || userB == null) {
+            throw new IllegalArgumentException("user1Id와 user2Id는 null일 수 없습니다.");
+        }
+        if (userA.equals(userB)) {
+            throw new IllegalArgumentException("자기 자신과는 채팅방을 만들 수 없습니다.");
+        }
         if (userA < userB) {
             this.user1Id = userA;
             this.user2Id = userB;
@@ -44,13 +50,20 @@ public class DirectChatRoom {
             this.user1Id = userB;
             this.user2Id = userA;
         }
+        LocalDateTime now = LocalDateTime.now();
+        this.createdTime = now;
+        this.updatedTime = now;
     }
 
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
-        this.createdTime = now;
-        this.updatedTime = now;
+        if (this.createdTime == null) {
+            this.createdTime = now;
+        }
+        if (this.updatedTime == null) {
+            this.updatedTime = now;
+        }
         normalizeUsers();
     }
 

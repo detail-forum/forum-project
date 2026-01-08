@@ -323,8 +323,8 @@ export interface DirectChatMessagePageDTO {
 }
 
 export interface CreateDirectMessageDTO {
-  message?: string
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE'
+  message: string
+  messageType: 'TEXT' | 'IMAGE' | 'FILE'
   fileUrl?: string
   fileName?: string
   fileSize?: number

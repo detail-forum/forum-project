@@ -8,6 +8,7 @@ import com.pgh.api_practice.entity.DirectChatMessage;
 import com.pgh.api_practice.entity.DirectChatReadStatus;
 import com.pgh.api_practice.entity.DirectChatRoom;
 import com.pgh.api_practice.entity.Users;
+import com.pgh.api_practice.exception.ResourceNotFoundException;
 import com.pgh.api_practice.repository.DirectChatMessageRepository;
 import com.pgh.api_practice.repository.DirectChatReadStatusRepository;
 import com.pgh.api_practice.repository.DirectChatRoomRepository;
@@ -36,16 +37,29 @@ public class DirectChatService {
     /** 1대1 채팅방 생성 또는 조회 */
     @Transactional
     public DirectChatRoomDTO getOrCreateRoom(Long otherUserId) {
+        if (otherUserId == null) {
+            throw new IllegalArgumentException("상대 사용자 ID는 필수입니다.");
+        }
+        
         Users me = getCurrentUser();
+        
+        // 자기 자신과는 채팅방 생성 불가
+        if (me.getId().equals(otherUserId)) {
+            throw new IllegalArgumentException("자기 자신과는 채팅방을 만들 수 없습니다.");
+        }
+        
         Users other = userRepository.findById(otherUserId)
-                .orElseThrow(() -> new IllegalArgumentException("상대 사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResourceNotFoundException("상대 사용자를 찾을 수 없습니다: " + otherUserId));
 
         Long user1 = Math.min(me.getId(), other.getId());
         Long user2 = Math.max(me.getId(), other.getId());
 
         DirectChatRoom room = roomRepository
                 .findByUser1IdAndUser2Id(user1, user2)
-                .orElseGet(() -> roomRepository.save(new DirectChatRoom(user1, user2)));
+                .orElseGet(() -> {
+                    DirectChatRoom newRoom = new DirectChatRoom(user1, user2);
+                    return roomRepository.save(newRoom);
+                });
 
         return toRoomDTO(room, me.getId());
     }
@@ -67,7 +81,7 @@ public class DirectChatService {
     private DirectChatRoomDTO toRoomDTO(DirectChatRoom room, Long myUserId) {
         Long otherUserId = room.getOtherUserId(myUserId);
         Users other = userRepository.findById(otherUserId)
-                .orElseThrow();
+                .orElseThrow(() -> new ResourceNotFoundException("상대 사용자를 찾을 수 없습니다: " + otherUserId));
 
         DirectChatMessage lastMessage =
                 messageRepository.findTopByChatRoomOrderByCreatedTimeDesc(room).orElse(null);
@@ -105,8 +119,12 @@ public class DirectChatService {
                 .getAuthentication()
                 .getName();
 
+        if (username == null || "anonymousUser".equals(username)) {
+            throw new ResourceNotFoundException("인증이 필요합니다.");
+        }
+
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalStateException("인증 사용자 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResourceNotFoundException("인증 사용자 정보를 찾을 수 없습니다: " + username));
     }
 
     @Transactional
@@ -118,12 +136,12 @@ public class DirectChatService {
         Users me = getCurrentUser();
 
         DirectChatRoom room = roomRepository.findById(chatRoomId)
-                .orElseThrow(() -> new IllegalArgumentException("채팅방이 존재하지 않습니다."));
+                .orElseThrow(() -> new ResourceNotFoundException("채팅방이 존재하지 않습니다: " + chatRoomId));
 
         // 멤버 검증
         if (!room.getUser1Id().equals(me.getId())
                 && !room.getUser2Id().equals(me.getId())) {
-            throw new IllegalStateException("채팅방 접근 권한이 없습니다.");
+            throw new ResourceNotFoundException("채팅방 접근 권한이 없습니다.");
         }
 
         Pageable pageable = PageRequest.of(page, size);
@@ -181,7 +199,7 @@ public class DirectChatService {
             Long myLastReadMessageId
     ) {
         Users sender = userRepository.findById(message.getSenderId())
-                .orElseThrow();
+                .orElseThrow(() -> new ResourceNotFoundException("발신자를 찾을 수 없습니다: " + message.getSenderId()));
 
         boolean isRead;
 
@@ -201,6 +219,10 @@ public class DirectChatService {
                 .profileImageUrl(sender.getProfileImageUrl())
                 .message(message.getMessage())
                 .createdTime(message.getCreatedTime())
+                .messageType(message.getMessageType())
+                .fileUrl(message.getFileUrl())
+                .fileName(message.getFileName())
+                .fileSize(message.getFileSize())
                 .isRead(isRead)
                 .build();
     }
@@ -213,11 +235,11 @@ public class DirectChatService {
         Users me = getCurrentUser();
 
         DirectChatRoom room = roomRepository.findById(chatRoomId)
-                .orElseThrow(() -> new IllegalArgumentException("채팅방이 존재하지 않습니다."));
+                .orElseThrow(() -> new ResourceNotFoundException("채팅방이 존재하지 않습니다: " + chatRoomId));
 
         if (!room.getUser1Id().equals(me.getId())
                 && !room.getUser2Id().equals(me.getId())) {
-            throw new IllegalStateException("채팅방 접근 권한이 없습니다.");
+            throw new ResourceNotFoundException("채팅방 접근 권한이 없습니다.");
         }
 
         validateByType(dto);
@@ -252,7 +274,7 @@ public class DirectChatService {
 
     private DirectChatMessageDTO toMessageDTOForSend(DirectChatMessage message) {
         Users sender = userRepository.findById(message.getSenderId())
-                .orElseThrow();
+                .orElseThrow(() -> new ResourceNotFoundException("발신자를 찾을 수 없습니다: " + message.getSenderId()));
 
         return DirectChatMessageDTO.builder()
                 .id(message.getId())
