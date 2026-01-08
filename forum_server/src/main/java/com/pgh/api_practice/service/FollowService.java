@@ -4,6 +4,7 @@ import com.pgh.api_practice.entity.Follow;
 import com.pgh.api_practice.entity.Users;
 import com.pgh.api_practice.exception.ApplicationUnauthorizedException;
 import com.pgh.api_practice.exception.ResourceNotFoundException;
+import com.pgh.api_practice.repository.AuthRepository;
 import com.pgh.api_practice.repository.FollowRepository;
 import com.pgh.api_practice.repository.UserRepository;
 import lombok.AllArgsConstructor;
@@ -20,6 +21,7 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final AuthRepository authRepository;
     private final NotificationService notificationService;
 
     /** ✅ 팔로우 */
@@ -194,6 +196,42 @@ public class FollowService {
                 .followingCount(followingCount)
                 .isFollowing(isFollowing)
                 .build();
+    }
+    
+    /** ✅ 사용자 검색 (username 또는 nickname으로 검색) */
+    @Transactional(readOnly = true)
+    public List<UserInfoDTO> searchUsers(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+        
+        // AuthRepository의 검색 메서드 사용
+        List<Users> users = authRepository.searchUsers(query.trim());
+        
+        // 최대 20명까지만 반환
+        List<Users> limitedUsers = users.stream()
+                .limit(20)
+                .toList();
+        
+        return limitedUsers.stream()
+                .map(user -> {
+                    long followerCount = followRepository.countByFollowingId(user.getId());
+                    long followingCount = followRepository.countByFollowerId(user.getId());
+                    boolean isFollowing = checkIfCurrentUserIsFollowing(user.getId());
+                    
+                    return UserInfoDTO.builder()
+                            .id(user.getId())
+                            .username(user.getUsername())
+                            .nickname(user.getNickname())
+                            .email(user.getEmail())
+                            .profileImageUrl(user.getProfileImageUrl())
+                            .githubLink(user.getGithubLink())
+                            .followerCount(followerCount)
+                            .followingCount(followingCount)
+                            .isFollowing(isFollowing)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
     
     /** 사용자 정보 DTO */

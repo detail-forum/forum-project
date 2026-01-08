@@ -436,6 +436,13 @@ export const followApi = {
     const response = await apiClient.get<ApiResponse<import('@/types/api').UserInfoDTO>>(`/follow/user/${encodeURIComponent(username)}`)
     return response.data
   },
+
+  searchUsers: async (query: string): Promise<ApiResponse<import('@/types/api').UserInfoDTO[]>> => {
+    const response = await apiClient.get<ApiResponse<import('@/types/api').UserInfoDTO[]>>(`/follow/search`, {
+      params: { query },
+    })
+    return response.data
+  },
 }
 
 // Comment API

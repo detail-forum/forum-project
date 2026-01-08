@@ -3,6 +3,7 @@
 import { useState, lazy, Suspense, useEffect } from 'react'
 import Header from '@/components/Header'
 import Hero from '@/components/Hero'
+import SearchBar from '@/components/SearchBar'
 import { PostListSkeleton } from '@/components/SkeletonLoader'
 
 // 동적 임포트로 코드 스플리팅
@@ -21,6 +22,11 @@ export default function Home() {
     <div className="min-h-screen bg-white">
       <Header onLoginClick={() => setIsLoginModalOpen(true)} />
       <Hero />
+      
+      {/* 통합 검색 바 */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 mb-8 relative z-20">
+        <SearchBar />
+      </div>
       
       {/* 섹션 구분선 */}
       <div className="relative my-8">

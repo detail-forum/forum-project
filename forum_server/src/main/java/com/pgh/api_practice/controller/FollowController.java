@@ -86,4 +86,12 @@ public class FollowController {
         boolean isFollowing = followService.isFollowing(userId);
         return ResponseEntity.ok(ApiResponse.ok(isFollowing, isFollowing ? "팔로우 중" : "팔로우하지 않음"));
     }
+    
+    /** ✅ 사용자 검색 (username 또는 nickname으로 검색) */
+    // GET http://localhost:8081/follow/search?query=검색어
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<FollowService.UserInfoDTO>>> searchUsers(@RequestParam String query) {
+        List<FollowService.UserInfoDTO> users = followService.searchUsers(query);
+        return ResponseEntity.ok(ApiResponse.ok(users, "사용자 검색 성공"));
+    }
 }
