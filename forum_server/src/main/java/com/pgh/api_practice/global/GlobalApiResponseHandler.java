@@ -5,6 +5,9 @@ import com.pgh.api_practice.dto.ValidationErrorDTO;
 import com.pgh.api_practice.exception.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -103,5 +106,27 @@ public class GlobalApiResponseHandler {
     @ExceptionHandler(ApplicationBadRequestException.class)
     public ResponseEntity<ApiResponse<Void>> handleApplicationBadRequestException(ApplicationBadRequestException ex) {
         return ResponseEntity.badRequest().body(ApiResponse.fail(ex.getMessage()));
+    }
+
+    // 401: Spring Security 인증 실패 (아이디/비밀번호 틀림)
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
+        return ResponseEntity.status(401).body(ApiResponse.fail("아이디 또는 비밀번호가 올바르지 않습니다."));
+    }
+
+    // 401: 기타 인증 예외
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
+        String message = "인증에 실패했습니다.";
+        if (ex.getMessage() != null && ex.getMessage().contains("자격 증명")) {
+            message = "아이디 또는 비밀번호가 올바르지 않습니다.";
+        }
+        return ResponseEntity.status(401).body(ApiResponse.fail(message));
+    }
+
+    // 401: 인증 자격 증명 없음
+    @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationCredentialsNotFound(AuthenticationCredentialsNotFoundException ex) {
+        return ResponseEntity.status(401).body(ApiResponse.fail("인증 정보가 없습니다."));
     }
 }

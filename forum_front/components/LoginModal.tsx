@@ -70,15 +70,34 @@ export default function LoginModal({ isOpen = true, onClose, onLoginSuccess }: L
         }
       }
     } catch (err: any) {
+      const status = err.response?.status
       const errorMessage = err.response?.data?.message || '오류가 발생했습니다.'
-      setError(errorMessage)
       
-      // 이메일 인증이 완료되지 않은 경우 재발송 UI 표시
-      if (errorMessage.includes('이메일 인증이 완료되지 않았습니다') || 
-          errorMessage.includes('이메일 인증')) {
-        setShowEmailVerification(true)
-        // 사용자가 입력한 이메일이 있으면 사용, 없으면 빈 문자열
-        setResendEmail('')
+      // 상태 코드에 따라 적절한 메시지 표시
+      if (status === 401 || status === 403) {
+        // 인증 실패 (아이디/비밀번호 틀림 또는 이메일 미인증)
+        if (errorMessage.includes('이메일 인증이 완료되지 않았습니다') || 
+            errorMessage.includes('이메일 인증')) {
+          setError('')
+          setShowEmailVerification(true)
+          setResendEmail('')
+        } else {
+          // 아이디/비밀번호 틀림
+          setError(errorMessage || '아이디 또는 비밀번호가 올바르지 않습니다.')
+          setShowEmailVerification(false)
+        }
+      } else if (status === 400) {
+        // 잘못된 요청 (입력값 오류 등)
+        setError(errorMessage)
+        setShowEmailVerification(false)
+      } else if (status === 500) {
+        // 서버 오류
+        setError('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+        setShowEmailVerification(false)
+      } else {
+        // 기타 오류
+        setError(errorMessage)
+        setShowEmailVerification(false)
       }
     } finally {
       setLoading(false)
