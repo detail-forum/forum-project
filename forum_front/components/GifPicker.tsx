@@ -26,6 +26,16 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
       const currentOffset = reset ? 0 : offset
       const response = await giphyApi.getTrending(25, currentOffset)
       
+      // API 키가 없으면 빈 배열 반환 (오류 던지지 않음)
+      if (!response.data || response.data.length === 0) {
+        if (reset) {
+          setGifs([])
+          setOffset(0)
+        }
+        setHasMore(false)
+        return
+      }
+      
       if (reset) {
         setGifs(response.data)
         setOffset(25)
@@ -37,8 +47,11 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
       setHasMore(response.data.length === 25)
     } catch (error) {
       console.error('트렌딩 GIF 로드 실패:', error)
-      // API 키가 없어도 에러를 표시하지 않고 빈 배열 유지
-      setGifs([])
+      // 오류 발생 시 빈 배열 유지 (사용자에게 오류 표시하지 않음)
+      if (reset) {
+        setGifs([])
+        setOffset(0)
+      }
       setHasMore(false)
     } finally {
       setLoading(false)
@@ -57,6 +70,16 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
       const currentOffset = reset ? 0 : offset
       const response = await giphyApi.search(query, 25, currentOffset)
       
+      // API 키가 없으면 빈 배열 반환 (오류 던지지 않음)
+      if (!response.data || response.data.length === 0) {
+        if (reset) {
+          setGifs([])
+          setOffset(0)
+        }
+        setHasMore(false)
+        return
+      }
+      
       if (reset) {
         setGifs(response.data)
         setOffset(25)
@@ -68,7 +91,11 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
       setHasMore(response.data.length === 25)
     } catch (error) {
       console.error('GIF 검색 실패:', error)
-      setGifs([])
+      // 오류 발생 시 빈 배열 유지
+      if (reset) {
+        setGifs([])
+        setOffset(0)
+      }
       setHasMore(false)
     } finally {
       setLoading(false)

@@ -19,7 +19,8 @@ pipeline {
         
         // 프론트엔드 API URL (HTTPS)
         NEXT_PUBLIC_API_URL = 'https://forum.rjsgud.com/api'
-        NEXT_PUBLIC_GIPHY_API_KEY = credentials('giphy-api-key')
+        // GIPHY API 키는 withCredentials 블록에서 환경 변수로 설정됩니다
+        // NEXT_PUBLIC_GIPHY_API_KEY는 빌드 단계에서 withCredentials를 통해 설정됨
     }
 
     stages {
@@ -39,43 +40,55 @@ pipeline {
         stage('Frontend Build') {
             steps {
                 dir('forum_front') {
-                    powershell '''
-                        Write-Host "===== Frontend Build =====" -ForegroundColor Cyan
-                        Write-Host ""
-                        
-                        Write-Host "Node.js version:" -ForegroundColor Yellow
-                        node -v
-                        Write-Host "npm version:" -ForegroundColor Yellow
-                        npm -v
-                        Write-Host ""
-                        
-                        Write-Host "Installing dependencies..." -ForegroundColor Yellow
-                        Write-Host "Updating package-lock.json..." -ForegroundColor Cyan
-                        npm install --legacy-peer-deps
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Host "[ERROR] npm install failed!" -ForegroundColor Red
-                            exit 1
-                        }
-                        Write-Host ""
-                        
-                        Write-Host "Building Next.js application..." -ForegroundColor Yellow
-                        Write-Host "API URL: $env:NEXT_PUBLIC_API_URL" -ForegroundColor Cyan
-                        npm run build
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Host "[ERROR] npm run build failed!" -ForegroundColor Red
-                            exit 1
-                        }
-                        Write-Host ""
-                        
-                        Write-Host "Verifying build output..." -ForegroundColor Yellow
-                        if (-not (Test-Path ".next")) {
-                            Write-Host "[ERROR] .next directory not found after build!" -ForegroundColor Red
-                            Get-ChildItem
-                            exit 1
-                        }
-                        Write-Host ""
-                        Write-Host "Frontend build completed successfully" -ForegroundColor Green
-                    '''
+                    // withCredentials를 사용하여 Credentials를 환경 변수로 노출
+                    withCredentials([string(credentialsId: 'giphy-api-key', variable: 'GIPHY_API_KEY')]) {
+                        powershell '''
+                            Write-Host "===== Frontend Build =====" -ForegroundColor Cyan
+                            Write-Host ""
+                            
+                            Write-Host "Node.js version:" -ForegroundColor Yellow
+                            node -v
+                            Write-Host "npm version:" -ForegroundColor Yellow
+                            npm -v
+                            Write-Host ""
+                            
+                            Write-Host "Installing dependencies..." -ForegroundColor Yellow
+                            Write-Host "Updating package-lock.json..." -ForegroundColor Cyan
+                            npm install --legacy-peer-deps
+                            if ($LASTEXITCODE -ne 0) {
+                                Write-Host "[ERROR] npm install failed!" -ForegroundColor Red
+                                exit 1
+                            }
+                            Write-Host ""
+                            
+                            Write-Host "Building Next.js application..." -ForegroundColor Yellow
+                            Write-Host "API URL: $env:NEXT_PUBLIC_API_URL" -ForegroundColor Cyan
+                            
+                            # GIPHY API 키를 환경 변수로 설정 (Next.js 빌드 시 필요)
+                            if ($env:GIPHY_API_KEY) {
+                                $env:NEXT_PUBLIC_GIPHY_API_KEY = $env:GIPHY_API_KEY
+                                Write-Host "GIPHY API Key: Set" -ForegroundColor Cyan
+                            } else {
+                                Write-Host "GIPHY API Key: Not set (GIF 기능 비활성화)" -ForegroundColor Yellow
+                            }
+                            
+                            npm run build
+                            if ($LASTEXITCODE -ne 0) {
+                                Write-Host "[ERROR] npm run build failed!" -ForegroundColor Red
+                                exit 1
+                            }
+                            Write-Host ""
+                            
+                            Write-Host "Verifying build output..." -ForegroundColor Yellow
+                            if (-not (Test-Path ".next")) {
+                                Write-Host "[ERROR] .next directory not found after build!" -ForegroundColor Red
+                                Get-ChildItem
+                                exit 1
+                            }
+                            Write-Host ""
+                            Write-Host "Frontend build completed successfully" -ForegroundColor Green
+                        '''
+                    }
                 }
             }
         }
