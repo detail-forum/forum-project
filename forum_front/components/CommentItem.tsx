@@ -207,7 +207,37 @@ export default function CommentItem({
             </div>
           </div>
         ) : (
-          <div className="text-gray-800 whitespace-pre-wrap mb-3">{comment.body}</div>
+          <div className="text-gray-800 whitespace-pre-wrap mb-3">
+            {comment.body.split(/(!\[.*?\]\(.*?\))/g).map((part, index) => {
+              // 마크다운 이미지 형식 파싱: ![alt](url)
+              const imageMatch = part.match(/!\[(.*?)\]\((.*?)\)/)
+              if (imageMatch) {
+                const [, alt, url] = imageMatch
+                // GIF URL인지 확인
+                if (url.match(/\.(gif|GIF)$/) || url.includes('giphy.com') || url.includes('media.giphy.com')) {
+                  return (
+                    <img
+                      key={index}
+                      src={url}
+                      alt={alt || 'GIF'}
+                      className="max-w-full h-auto rounded-lg my-2"
+                      style={{ maxHeight: '300px' }}
+                    />
+                  )
+                }
+                return (
+                  <img
+                    key={index}
+                    src={url}
+                    alt={alt || '이미지'}
+                    className="max-w-full h-auto rounded-lg my-2"
+                    style={{ maxHeight: '300px' }}
+                  />
+                )
+              }
+              return <span key={index}>{part}</span>
+            })}
+          </div>
         )}
 
         {/* 댓글 액션 버튼 */}

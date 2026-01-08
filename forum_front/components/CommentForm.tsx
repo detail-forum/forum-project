@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { commentApi } from '@/services/api'
 import { store } from '@/store/store'
 import { logout } from '@/store/slices/authSlice'
+import GifPicker from './GifPicker'
 
 interface CommentFormProps {
   postId: number
@@ -22,6 +23,7 @@ export default function CommentForm({
 }: CommentFormProps) {
   const [body, setBody] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showGifPicker, setShowGifPicker] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,35 +68,63 @@ export default function CommentForm({
     }
   }
 
+  const handleGifSelect = (gifUrl: string) => {
+    // GIF를 마크다운 이미지 형식으로 추가
+    const gifMarkdown = `![GIF](${gifUrl})`
+    setBody(prev => prev ? `${prev}\n${gifMarkdown}` : gifMarkdown)
+    setShowGifPicker(false)
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder={placeholder}
-        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-        rows={3}
-        disabled={isSubmitting}
-      />
-      <div className="flex justify-end space-x-2">
-        {onCancel && (
+    <>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="relative">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={placeholder}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none pr-10"
+            rows={3}
+            disabled={isSubmitting}
+          />
           <button
             type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            onClick={() => setShowGifPicker(true)}
+            disabled={isSubmitting}
+            className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-600 transition disabled:opacity-50"
+            title="GIF 추가"
           >
-            취소
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </button>
-        )}
-        <button
-          type="submit"
-          disabled={isSubmitting || !body.trim()}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? '작성 중...' : '작성'}
-        </button>
-      </div>
-    </form>
+        </div>
+        <div className="flex justify-end space-x-2">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              취소
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={isSubmitting || !body.trim()}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? '작성 중...' : '작성'}
+          </button>
+        </div>
+      </form>
+      <GifPicker
+        isOpen={showGifPicker}
+        onClose={() => setShowGifPicker(false)}
+        onSelect={handleGifSelect}
+      />
+    </>
   )
 }
 
