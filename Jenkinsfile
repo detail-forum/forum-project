@@ -19,6 +19,7 @@ pipeline {
         
         // 프론트엔드 API URL (HTTPS)
         NEXT_PUBLIC_API_URL = 'https://forum.rjsgud.com/api'
+        NEXT_PUBLIC_GIPHY_API_KEY = credentials('giphy-api-key')
     }
 
     stages {
