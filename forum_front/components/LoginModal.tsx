@@ -22,6 +22,10 @@ export default function LoginModal({ isOpen = true, onClose, onLoginSuccess }: L
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showEmailVerification, setShowEmailVerification] = useState(false)
+  const [resendEmail, setResendEmail] = useState('')
+  const [resending, setResending] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
   const dispatch = useDispatch()
   const router = useRouter()
 
@@ -66,9 +70,46 @@ export default function LoginModal({ isOpen = true, onClose, onLoginSuccess }: L
         }
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || '오류가 발생했습니다.')
+      const errorMessage = err.response?.data?.message || '오류가 발생했습니다.'
+      setError(errorMessage)
+      
+      // 이메일 인증이 완료되지 않은 경우 재발송 UI 표시
+      if (errorMessage.includes('이메일 인증이 완료되지 않았습니다') || 
+          errorMessage.includes('이메일 인증')) {
+        setShowEmailVerification(true)
+        // 사용자가 입력한 이메일이 있으면 사용, 없으면 빈 문자열
+        setResendEmail('')
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    if (!resendEmail.trim()) {
+      setError('이메일 주소를 입력해주세요.')
+      return
+    }
+
+    setResending(true)
+    setError('')
+    setResendSuccess(false)
+
+    try {
+      const response = await authApi.resendVerificationEmail(resendEmail)
+      if (response.success) {
+        setResendSuccess(true)
+        setError('')
+        setTimeout(() => {
+          setShowEmailVerification(false)
+          setResendEmail('')
+          setResendSuccess(false)
+        }, 3000)
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || '인증 메일 재발송에 실패했습니다.')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -163,17 +204,74 @@ export default function LoginModal({ isOpen = true, onClose, onLoginSuccess }: L
               </>
             )}
 
-            {error && (
+            {error && !showEmailVerification && (
               <div className="text-red-500 text-sm">{error}</div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? '처리 중...' : isLogin ? '로그인' : '회원가입'}
-            </button>
+            {showEmailVerification && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800 mb-2">
+                      이메일 인증이 필요합니다
+                    </p>
+                    <p className="text-sm text-yellow-700 mb-3">
+                      로그인하려면 먼저 이메일 인증을 완료해주세요. 인증 메일을 받지 못하셨다면 아래에서 재발송할 수 있습니다.
+                    </p>
+                    <div className="space-y-2">
+                      <input
+                        type="email"
+                        placeholder="이메일 주소를 입력하세요"
+                        value={resendEmail}
+                        onChange={(e) => setResendEmail(e.target.value)}
+                        className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={resending || resendSuccess}
+                        className="w-full py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      >
+                        {resending ? '발송 중...' : resendSuccess ? '발송 완료!' : '인증 메일 재발송'}
+                      </button>
+                      {resendSuccess && (
+                        <p className="text-sm text-green-600 text-center">
+                          인증 메일이 발송되었습니다. 이메일을 확인해주세요.
+                        </p>
+                      )}
+                      {error && showEmailVerification && (
+                        <p className="text-sm text-red-600">{error}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEmailVerification(false)
+                        setResendEmail('')
+                        setError('')
+                        setResendSuccess(false)
+                      }}
+                      className="mt-2 text-sm text-yellow-700 hover:text-yellow-900 underline"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!showEmailVerification && (
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? '처리 중...' : isLogin ? '로그인' : '회원가입'}
+              </button>
+            )}
           </form>
 
           <div className="mt-4 text-center">
@@ -182,6 +280,9 @@ export default function LoginModal({ isOpen = true, onClose, onLoginSuccess }: L
                 setIsLogin(!isLogin)
                 setError('')
                 setFormData({ username: '', password: '', nickname: '', email: '' })
+                setShowEmailVerification(false)
+                setResendEmail('')
+                setResendSuccess(false)
               }}
               className="text-sm text-primary hover:underline"
             >
