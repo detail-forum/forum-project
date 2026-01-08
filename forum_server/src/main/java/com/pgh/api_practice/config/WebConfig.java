@@ -47,6 +47,9 @@ public class WebConfig {
                 registry.addResourceHandler("/uploads/**")
                         .addResourceLocations("file:" + uploadPath)
                         .setCachePeriod(86400); // 24시간 캐싱
+                
+                // /api/로 시작하는 경로는 정적 리소스 핸들러에서 제외
+                // (컨트롤러 매핑이 우선되어야 함)
             }
         };
     }

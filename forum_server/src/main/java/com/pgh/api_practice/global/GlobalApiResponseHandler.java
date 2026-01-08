@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -136,6 +137,18 @@ public class GlobalApiResponseHandler {
     public ResponseEntity<ApiResponse<Void>> handleNoHandlerFound(NoHandlerFoundException ex) {
         ex.printStackTrace();
         return ResponseEntity.status(404).body(ApiResponse.fail("요청한 경로를 찾을 수 없습니다: " + ex.getRequestURL()));
+    }
+
+    // 404: 정적 리소스를 찾을 수 없음 (NoResourceFoundException) - 컨트롤러 매핑 실패 시 발생
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+        ex.printStackTrace();
+        String resourcePath = ex.getResourcePath();
+        // /api/로 시작하는 경로는 API 엔드포인트이므로 더 명확한 메시지 제공
+        if (resourcePath != null && resourcePath.startsWith("/api/")) {
+            return ResponseEntity.status(404).body(ApiResponse.fail("API 엔드포인트를 찾을 수 없습니다: " + resourcePath));
+        }
+        return ResponseEntity.status(404).body(ApiResponse.fail("요청한 리소스를 찾을 수 없습니다: " + resourcePath));
     }
 
     // 500: RuntimeException 처리
