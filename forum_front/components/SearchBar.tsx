@@ -66,11 +66,11 @@ export default function SearchBar() {
 
     try {
       const [postsResponse, groupsResponse, usersResponse] = await Promise.all([
-        // 게시물 검색
-        postApi.getPostList(0, 10, 'RESENT', undefined, query, undefined).catch(() => ({ success: false, data: { content: [] } })),
-        // 모임 검색 (검색 파라미터가 없으면 클라이언트 사이드 필터링)
-        groupApi.getGroupList(0, 50, undefined).catch(() => ({ success: false, data: { content: [] } })),
-        // 사용자 검색
+        // 게시물 검색 (결과 수 증가: 10 -> 50)
+        postApi.getPostList(0, 50, 'RESENT', undefined, query, undefined).catch(() => ({ success: false, data: { content: [] } })),
+        // 모임 검색 (백엔드 API 사용)
+        groupApi.searchGroups(query).catch(() => ({ success: false, data: [] })),
+        // 사용자 검색 (결과 수 증가: 20 -> 50)
         followApi.searchUsers(query).catch(() => ({ success: false, data: [] })),
       ])
 
@@ -79,14 +79,10 @@ export default function SearchBar() {
         ? postsResponse.data.content
         : []
 
-      // 모임 결과 (클라이언트 사이드 필터링)
-      const allGroups = groupsResponse.success && groupsResponse.data?.content
-        ? groupsResponse.data.content
+      // 모임 결과 (백엔드 검색 API 사용)
+      const groups = groupsResponse.success && groupsResponse.data
+        ? groupsResponse.data
         : []
-      const filteredGroups = allGroups.filter((group: GroupListDTO) =>
-        group.name.toLowerCase().includes(query.toLowerCase()) ||
-        (group.description && group.description.toLowerCase().includes(query.toLowerCase()))
-      )
 
       // 사용자 검색 결과
       const users = usersResponse.success && usersResponse.data
@@ -96,7 +92,7 @@ export default function SearchBar() {
       setResults({
         posts,
         users,
-        groups: filteredGroups,
+        groups,
       })
     } catch (error) {
       console.error('검색 실패:', error)
@@ -204,7 +200,7 @@ export default function SearchBar() {
 
       {/* 검색 결과 */}
       {showResults && searchQuery.trim().length >= 2 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 max-h-[600px] overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 max-h-[800px] overflow-y-auto">
           {/* 탭 */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-4 pt-4">
             <div className="flex gap-2">
@@ -271,9 +267,11 @@ export default function SearchBar() {
                 {/* 게시물 결과 */}
                 {filteredResults.posts.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">게시물</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      게시물 ({filteredResults.posts.length}개)
+                    </h3>
                     <div className="space-y-2">
-                      {filteredResults.posts.map((post) => (
+                      {filteredResults.posts.slice(0, 20).map((post) => (
                         <Link
                           key={post.id}
                           href={`/posts/${post.id}`}
@@ -299,6 +297,11 @@ export default function SearchBar() {
                           </div>
                         </Link>
                       ))}
+                      {filteredResults.posts.length > 20 && (
+                        <div className="text-center py-2 text-sm text-gray-500">
+                          외 {filteredResults.posts.length - 20}개의 게시물 더 보기
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -306,9 +309,11 @@ export default function SearchBar() {
                 {/* 사용자 결과 */}
                 {filteredResults.users.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">사용자</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      사용자 ({filteredResults.users.length}개)
+                    </h3>
                     <div className="space-y-2">
-                      {filteredResults.users.map((user) => (
+                      {filteredResults.users.slice(0, 20).map((user) => (
                         <Link
                           key={user.id}
                           href={`/users/${user.username}`}
@@ -340,6 +345,11 @@ export default function SearchBar() {
                           </div>
                         </Link>
                       ))}
+                      {filteredResults.users.length > 20 && (
+                        <div className="text-center py-2 text-sm text-gray-500">
+                          외 {filteredResults.users.length - 20}명의 사용자 더 보기
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -347,9 +357,11 @@ export default function SearchBar() {
                 {/* 모임 결과 */}
                 {filteredResults.groups.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">모임</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      모임 ({filteredResults.groups.length}개)
+                    </h3>
                     <div className="space-y-2">
-                      {filteredResults.groups.map((group) => (
+                      {filteredResults.groups.slice(0, 20).map((group) => (
                         <Link
                           key={group.id}
                           href={`/social-gathering/${group.id}`}
@@ -383,6 +395,11 @@ export default function SearchBar() {
                           </div>
                         </Link>
                       ))}
+                      {filteredResults.groups.length > 20 && (
+                        <div className="text-center py-2 text-sm text-gray-500">
+                          외 {filteredResults.groups.length - 20}개의 모임 더 보기
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

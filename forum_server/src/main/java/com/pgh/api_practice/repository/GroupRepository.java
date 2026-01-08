@@ -19,4 +19,17 @@ public interface GroupRepository extends JpaRepository<Group, Long> {
     
     // ID 리스트로 모임 조회
     Page<Group> findByIdInAndIsDeletedFalseOrderByCreatedTimeDesc(List<Long> ids, Pageable pageable);
+    
+    /** 모임 검색 (이름 또는 설명으로 검색) - 강화된 검색 */
+    @org.springframework.data.jpa.repository.Query("SELECT g FROM Group g WHERE " +
+           "g.isDeleted = false AND " +
+           "(LOWER(g.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(g.description) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           "ORDER BY " +
+           "CASE WHEN LOWER(g.name) = LOWER(:query) THEN 1 " +
+           "     WHEN LOWER(g.name) LIKE LOWER(CONCAT(:query, '%')) THEN 2 " +
+           "     WHEN LOWER(g.description) LIKE LOWER(CONCAT(:query, '%')) THEN 3 " +
+           "     ELSE 4 END, " +
+           "g.createdTime DESC")
+    List<Group> searchGroups(@org.springframework.data.repository.query.Param("query") String query);
 }

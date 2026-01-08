@@ -25,11 +25,18 @@ public interface AuthRepository extends JpaRepository<Users, Long> {
     Optional<Users> findByEmail(String email);
     Optional<Users> findByEmailVerificationToken(String token);
     
-    /** 사용자 검색 (username 또는 nickname으로 검색) */
+    /** 사용자 검색 (username 또는 nickname으로 검색) - 강화된 검색 */
     @Query("SELECT u FROM Users u WHERE " +
            "u.isDeleted = false AND u.emailVerified = true AND " +
            "(LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(u.nickname) LIKE LOWER(CONCAT('%', :query, '%'))) " +
-           "ORDER BY u.nickname ASC")
+           "LOWER(u.nickname) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           "ORDER BY " +
+           "CASE WHEN LOWER(u.username) = LOWER(:query) THEN 1 " +
+           "     WHEN LOWER(u.nickname) = LOWER(:query) THEN 2 " +
+           "     WHEN LOWER(u.username) LIKE LOWER(CONCAT(:query, '%')) THEN 3 " +
+           "     WHEN LOWER(u.nickname) LIKE LOWER(CONCAT(:query, '%')) THEN 4 " +
+           "     ELSE 5 END, " +
+           "u.nickname ASC")
     List<Users> searchUsers(@Param("query") String query);
 }

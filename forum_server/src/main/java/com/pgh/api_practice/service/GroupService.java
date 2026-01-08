@@ -95,6 +95,45 @@ public class GroupService {
         return created.getId();
     }
 
+    /** 모임 검색 (이름 또는 설명으로 검색) */
+    @Transactional(readOnly = true)
+    public List<GroupListDTO> searchGroups(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+        
+        List<Group> groups = groupRepository.searchGroups(query.trim());
+        
+        // 최대 100개까지만 반환
+        List<Group> limitedGroups = groups.stream()
+                .limit(100)
+                .toList();
+        
+        Users currentUser = getCurrentUser();
+        
+        return limitedGroups.stream()
+                .map(group -> {
+                    long memberCount = groupMemberRepository.countByGroupId(group.getId());
+                    boolean isMember = currentUser != null && (
+                            group.getOwner().getId().equals(currentUser.getId()) ||
+                            groupMemberRepository.existsByGroupIdAndUserId(group.getId(), currentUser.getId())
+                    );
+                    
+                    return GroupListDTO.builder()
+                            .id(group.getId())
+                            .name(group.getName())
+                            .description(group.getDescription())
+                            .ownerUsername(group.getOwner().getUsername())
+                            .ownerNickname(group.getOwner().getNickname())
+                            .profileImageUrl(group.getProfileImageUrl())
+                            .memberCount((int) memberCount)
+                            .createdTime(group.getCreatedTime())
+                            .isMember(isMember)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
     /** 모임 목록 조회 */
     @Transactional(readOnly = true)
     public Page<GroupListDTO> getGroupList(Pageable pageable, Boolean myGroups) {

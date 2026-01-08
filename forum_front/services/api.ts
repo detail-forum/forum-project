@@ -492,6 +492,16 @@ export const groupApi = {
     if (myGroups !== undefined) {
       params.myGroups = myGroups
     }
+    const response = await apiClient.get<ApiResponse<any>>('/group', { params })
+    return response.data
+  },
+
+  searchGroups: async (query: string): Promise<ApiResponse<import('@/types/api').GroupListDTO[]>> => {
+    const response = await apiClient.get<ApiResponse<import('@/types/api').GroupListDTO[]>>('/group/search', {
+      params: { query },
+    })
+    return response.data
+  },
     const response = await apiClient.get<ApiResponse<any>>('/group', {
       params,
     })

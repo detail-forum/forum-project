@@ -208,9 +208,9 @@ public class FollowService {
         // AuthRepository의 검색 메서드 사용
         List<Users> users = authRepository.searchUsers(query.trim());
         
-        // 최대 20명까지만 반환
+        // 최대 50명까지만 반환 (검색 결과 증가)
         List<Users> limitedUsers = users.stream()
-                .limit(20)
+                .limit(50)
                 .toList();
         
         return limitedUsers.stream()

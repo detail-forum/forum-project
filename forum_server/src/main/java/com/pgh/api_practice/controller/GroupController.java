@@ -36,6 +36,13 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.ok(list, "모임 목록 조회 성공"));
     }
 
+    /** 모임 검색 (이름 또는 설명으로 검색) */
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<GroupListDTO>>> searchGroups(@RequestParam String query) {
+        List<GroupListDTO> groups = groupService.searchGroups(query);
+        return ResponseEntity.ok(ApiResponse.ok(groups, "모임 검색 성공"));
+    }
+
     /** 모임 상세 조회 */
     @GetMapping("/{groupId}")
     public ResponseEntity<ApiResponse<GroupDetailDTO>> getGroupDetail(@PathVariable Long groupId) {
