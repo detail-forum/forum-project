@@ -11,6 +11,7 @@ import { ko } from 'date-fns/locale'
 import { getUsernameFromToken } from '@/utils/jwt'
 import { directChatApi, groupApi, imageUploadApi, fileUploadApi, followApi } from '@/services/api'
 import type { DirectChatRoomDTO, DirectChatMessageDTO, GroupChatRoomDTO, GroupChatMessageDTO } from '@/types/api'
+import { useDirectWebSocket } from '@/hooks/useDirectWebSocket'
 
 // 확장된 그룹 채팅방 타입 (그룹 정보 포함)
 interface ExtendedGroupChatRoom extends GroupChatRoomDTO {
@@ -58,22 +59,75 @@ export default function ChatPage() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  
+
+  const messageInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const currentUsernameRef = useRef<string | null>(null)
+
+  // 일반 채팅용 WebSocket 연결
+  const {
+    isConnected: isDirectConnected,
+    sendMessage: wsSendDirectMessage,
+    startTyping: startDirectTyping,
+    stopTyping: stopDirectTyping,
+    markAsRead: markDirectAsRead,
+    typingUsers: directTypingUsers,
+  } = useDirectWebSocket({
+    roomId: selectedDirectChat,
+    enabled: isAuthenticated && currentTab === 'direct' && !!selectedDirectChat,
+    onMessage: useCallback((message: DirectChatMessageDTO) => {
+      console.log('일반 채팅 메시지 수신:', message)
+      setDirectMessages(prev => {
+        // 중복 방지
+        if (prev.some(m => m.id === message.id)) {
+          console.log('중복 메시지 무시:', message.id)
+          return prev
+        }
+        // 시간순으로 정렬
+        const newMessages = [...prev, message].sort((a, b) => 
+          new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime()
+        )
+        return newMessages
+      })
+      // 새 메시지가 추가되면 스크롤
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }, []),
+    onTyping: useCallback((data: { username: string; isTyping: boolean }) => {
+      // 타이핑 상태는 훅에서 자동 관리됨
+    }, []),
+    onRead: useCallback((data: { messageId: number; username: string; isRead: boolean }) => {
+      // 읽음 상태 업데이트
+      setDirectMessages(prev => prev.map(msg => 
+        msg.id === data.messageId 
+          ? { ...msg, isRead: data.isRead }
+          : msg
+      ))
+    }, []),
+  })
 
   // 현재 사용자 초기화
   useEffect(() => {
     if (isAuthenticated) {
       const username = getUsernameFromToken()
       setCurrentUsername(username)
+      currentUsernameRef.current = username
     } else {
       setCurrentUsername(null)
+      currentUsernameRef.current = null
     }
   }, [isAuthenticated])
+
+  // currentUsername 변경 시 ref 업데이트
+  useEffect(() => {
+    currentUsernameRef.current = currentUsername
+  }, [currentUsername])
 
   // 채팅방 목록 로드
   useEffect(() => {
@@ -226,80 +280,148 @@ export default function ChatPage() {
   }
 
   // 1대1 채팅 메시지 조회
-  const fetchDirectMessages = async (chatRoomId: number) => {
-    try {
-      const response = await directChatApi.getMessages(chatRoomId, 0, 100)
-      if (response.success && response.data) {
-        setDirectMessages(response.data.content || [])
-        // 메시지 로드 후 스크롤 하단으로
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-        }, 100)
-      }
-    } catch (error) {
-      console.error('1대1 채팅 메시지 조회 실패:', error)
-    }
-  }
+ const fetchDirectMessages = async (chatRoomId: number) => {
+  try {
+    const response = await directChatApi.getMessages(chatRoomId, 0, 100)
+    if (response.success && response.data) {
+      const list = [...(response.data.content || [])].sort(
+        (a, b) => new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime()
+      )
+      setDirectMessages(list)
 
-  // 그룹 채팅 메시지 조회
-  const fetchGroupMessages = async (groupId: number, roomId: number) => {
-    try {
-      const response = await groupApi.getChatMessages(groupId, roomId, 0, 100)
-      if (response.success && response.data) {
-        setGroupMessages(response.data)
-        // 메시지 로드 후 스크롤 하단으로
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-        }, 100)
-      }
-    } catch (error) {
-      console.error('그룹 채팅 메시지 조회 실패:', error)
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
     }
+  } catch (error) {
+    console.error('1대1 채팅 메시지 조회 실패:', error)
   }
+}
+
+const fetchGroupMessages = async (groupId: number, roomId: number) => {
+  try {
+    const response = await groupApi.getChatMessages(groupId, roomId, 0, 100)
+    if (response.success && response.data) {
+      const list = [...response.data].sort(
+        (a, b) => new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime()
+      )
+      setGroupMessages(list)
+
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }
+  } catch (error) {
+    console.error('그룹 채팅 메시지 조회 실패:', error)
+  }
+}
+
 
   // 메시지 전송
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isAuthenticated || !newMessage.trim()) return
+const sendMessage = useCallback(async () => {
+  if (!isAuthenticated || sending) return
+  if (!newMessage.trim()) return
 
-    try {
-      setSending(true)
-      if (currentTab === 'direct' && selectedDirectChat) {
-        const response = await directChatApi.sendMessage(selectedDirectChat, {
-          message: newMessage.trim(),
-          messageType: 'TEXT' as const,
-        })
-        if (response.success && response.data) {
-          // 메시지 목록 새로고침
-          await fetchDirectMessages(selectedDirectChat)
+  try {
+    setSending(true)
+
+    if (currentTab === 'direct' && selectedDirectChat) {
+      // WebSocket으로 먼저 전송 시도
+      if (isDirectConnected) {
+        const success = wsSendDirectMessage(newMessage.trim())
+        if (success) {
           setNewMessage('')
-        } else {
-          console.error('메시지 전송 실패:', response.message)
-          alert(response.message || '메시지 전송에 실패했습니다.')
-        }
-      } else if (currentTab === 'group' && selectedGroupChat) {
-        const response = await groupApi.sendChatMessage(
-          selectedGroupChat.groupId,
-          selectedGroupChat.roomId,
-          { message: newMessage.trim() }
-        )
-        if (response.success) {
-          // 메시지 목록 새로고침
-          await fetchGroupMessages(selectedGroupChat.groupId, selectedGroupChat.roomId)
-          setNewMessage('')
-        } else {
-          console.error('메시지 전송 실패:', response.message)
-          alert(response.message || '메시지 전송에 실패했습니다.')
+          stopDirectTyping()
+          if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current)
+            typingTimeoutRef.current = null
+          }
+          return
         }
       }
-    } catch (error: any) {
-      console.error('메시지 전송 실패:', error)
-      const errorMessage = error.response?.data?.message || error.message || '메시지 전송에 실패했습니다.'
-      alert(errorMessage)
-    } finally {
-      setSending(false)
+      
+      // WebSocket 실패 시 REST API로 폴백
+      const response = await directChatApi.sendMessage(selectedDirectChat, {
+        message: newMessage.trim(),
+        messageType: 'TEXT' as const,
+      })
+
+      if (response.success && response.data) {
+        setNewMessage('')
+        stopDirectTyping()
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current)
+          typingTimeoutRef.current = null
+        }
+        await fetchDirectMessages(selectedDirectChat)
+      } else {
+        alert(response.message || '메시지 전송에 실패했습니다.')
+      }
+    }
+
+    if (currentTab === 'group' && selectedGroupChat) {
+      const response = await groupApi.sendChatMessage(
+        selectedGroupChat.groupId,
+        selectedGroupChat.roomId,
+        { message: newMessage.trim() }
+      )
+
+      if (response.success) {
+        setNewMessage('')
+        await fetchGroupMessages(selectedGroupChat.groupId, selectedGroupChat.roomId)
+      } else {
+        alert(response.message || '메시지 전송에 실패했습니다.')
+      }
+    }
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || error.message || '메시지 전송에 실패했습니다.'
+    alert(errorMessage)
+  } finally {
+    setSending(false)
+    // ✅ 전송 후에도 계속 채팅 가능하게 포커스 복귀
+    requestAnimationFrame(() => messageInputRef.current?.focus())
+  }
+}, [isAuthenticated, sending, newMessage, currentTab, selectedDirectChat, selectedGroupChat, isDirectConnected, wsSendDirectMessage, stopDirectTyping])
+
+// 폼 submit 핸들러는 얇게
+const handleSendMessage = async (e: React.FormEvent) => {
+  e.preventDefault()
+  await sendMessage()
+}
+
+// 타이핑 인디케이터 처리
+const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const value = e.target.value
+  setNewMessage(value)
+  
+  if (currentTab === 'direct' && selectedDirectChat) {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+    
+    if (value.trim() && isDirectConnected) {
+      startDirectTyping()
+      // 3초 후 자동으로 타이핑 종료
+      typingTimeoutRef.current = setTimeout(() => {
+        stopDirectTyping()
+      }, 3000)
+    } else {
+      stopDirectTyping()
     }
   }
+}
+
+// 메시지 표시 시 읽음 처리
+useEffect(() => {
+  if (currentTab === 'direct' && directMessages.length > 0 && isDirectConnected && currentUsername && selectedDirectChat) {
+    const lastMessage = directMessages[directMessages.length - 1]
+    // 본인이 보낸 메시지가 아니고, 아직 읽지 않은 경우
+    if (lastMessage.username !== currentUsername && !lastMessage.isRead) {
+      markDirectAsRead(lastMessage.id)
+    }
+  }
+}, [directMessages, isDirectConnected, currentUsername, currentTab, selectedDirectChat, markDirectAsRead])
+
 
   // 이미지 업로드
   const handleImageUpload = async (file: File) => {
@@ -463,6 +585,12 @@ export default function ChatPage() {
     room.groupName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     room.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+useEffect(() => {
+  if (currentChatRoom) {
+    requestAnimationFrame(() => messageInputRef.current?.focus())
+  }
+}, [currentChatRoom])
 
   // 현재 메시지 목록 (타입 변환)
   const currentMessages: Array<DirectChatMessageDTO | GroupChatMessageDTO> = currentTab === 'direct' 
@@ -861,11 +989,33 @@ export default function ChatPage() {
                                   </p>
                                 )}
                               </div>
+                              {/* 읽음 표시 - 일반 채팅만 (1대1이므로 상대방이 읽었으면 표시) */}
+                              {currentTab === 'direct' && isMyMessage && 'isRead' in message && (
+                                <span className="text-xs text-gray-400 whitespace-nowrap self-end pb-8">
+                                  {message.isRead ? '✓✓' : '✓'}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
                       )
                     })}
+                    {/* 타이핑 인디케이터 영역 - 일반 채팅만 */}
+                    {currentTab === 'direct' && directTypingUsers.length > 0 && (
+                      <div className="px-4 py-2 min-h-[40px] flex items-center">
+                        <div className="text-sm text-gray-500 italic">
+                          {directTypingUsers.length === 1 
+                            ? `${directTypingUsers[0]}님이 입력 중...`
+                            : `${directTypingUsers.length}명이 입력 중...`
+                          }
+                        </div>
+                      </div>
+                    )}
+                    {currentTab === 'direct' && directTypingUsers.length === 0 && (
+                      <div className="px-4 py-2 min-h-[40px] flex items-center">
+                        <div className="text-sm text-transparent">공간</div>
+                      </div>
+                    )}
                     <div ref={messagesEndRef} />
                   </>
                 )}
@@ -932,13 +1082,23 @@ export default function ChatPage() {
                     className="hidden"
                   />
                   <input
+                    ref={messageInputRef}
                     type="text"
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={handleInputChange}
+                    onKeyDown={(e) => {
+                      if ((e.nativeEvent as any).isComposing) return
+
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        sendMessage()
+                      }
+                    }}
                     placeholder="메시지를 입력하세요..."
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={sending || !isAuthenticated}
+                    disabled={!isAuthenticated}
                   />
+
                   <button
                     type="submit"
                     disabled={sending || !newMessage.trim() || !isAuthenticated}

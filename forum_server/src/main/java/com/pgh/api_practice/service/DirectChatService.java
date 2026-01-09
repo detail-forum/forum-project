@@ -378,8 +378,108 @@ public class DirectChatService {
         }
     }
 
-    // WebSocket 전송 스텁 (실제 구현은 WebSocket/SimpMessagingTemplate)
+    // WebSocket 전송 (WebSocket 엔드포인트에서 직접 처리하므로 빈 메서드)
     private void publishToWebSocket(DirectChatMessage message) {
-        // TODO: SimpMessagingTemplate.convertAndSend("/topic/direct/" + roomId, payload)
+        // WebSocket 메시지 전송은 WebSocketChatController에서 처리
+        // REST API를 통한 메시지 전송 시에는 WebSocket으로 브로드캐스트하지 않음
+        // (이미 저장된 메시지가 프론트엔드에서 자동으로 조회됨)
+    }
+
+    /** WebSocket을 통해 메시지 전송 (WebSocket 엔드포인트에서 호출) */
+    @Transactional
+    public DirectChatMessageDTO sendMessageViaWebSocket(Long chatRoomId, String messageText, String username) {
+        Users me = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다: " + username));
+
+        DirectChatRoom room = roomRepository.findById(chatRoomId)
+                .orElseThrow(() -> new ResourceNotFoundException("채팅방이 존재하지 않습니다: " + chatRoomId));
+
+        // 멤버 검증
+        if (!room.getUser1Id().equals(me.getId())
+                && !room.getUser2Id().equals(me.getId())) {
+            throw new ResourceNotFoundException("채팅방 접근 권한이 없습니다.");
+        }
+
+        if (messageText == null || messageText.trim().isEmpty()) {
+            throw new IllegalArgumentException("메시지는 필수입니다.");
+        }
+
+        DirectChatMessage message = new DirectChatMessage(
+                room,
+                me.getId(),
+                messageText.trim(),
+                DirectChatMessage.MessageType.TEXT,
+                null,
+                null,
+                null
+        );
+
+        DirectChatMessage saved = messageRepository.save(message);
+
+        // 본인의 읽음 상태 업데이트 (보낸 사람은 자동으로 읽음 처리)
+        DirectChatReadStatus readStatus = readStatusRepository
+                .findByChatRoomAndUserId(room, me.getId())
+                .orElseGet(() ->
+                        readStatusRepository.save(
+                                new DirectChatReadStatus(room, me.getId())
+                        )
+                );
+
+        readStatus.updateRead(saved);
+        readStatusRepository.save(readStatus);
+
+        // DTO 반환 (isRead는 false로 설정 - 상대방이 아직 읽지 않았음)
+        Users sender = userRepository.findById(saved.getSenderId())
+                .orElseThrow(() -> new ResourceNotFoundException("발신자를 찾을 수 없습니다: " + saved.getSenderId()));
+
+        return DirectChatMessageDTO.builder()
+                .id(saved.getId())
+                .roomId(saved.getChatRoom().getId())
+                .senderId(sender.getId())
+                .username(sender.getUsername())
+                .nickname(sender.getNickname())
+                .profileImageUrl(sender.getProfileImageUrl())
+                .message(saved.getMessage())
+                .createdTime(saved.getCreatedTime())
+                .messageType(saved.getMessageType())
+                .fileUrl(saved.getFileUrl())
+                .fileName(saved.getFileName())
+                .fileSize(saved.getFileSize())
+                .isRead(false) // 상대방이 아직 읽지 않았으므로 false
+                .build();
+    }
+
+    /** 일반 채팅 메시지 읽음 처리 */
+    @Transactional
+    public void markMessageAsRead(Long messageId, String username) {
+        DirectChatMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("메시지를 찾을 수 없습니다: " + messageId));
+
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다: " + username));
+
+        DirectChatRoom room = message.getChatRoom();
+
+        // 채팅방 멤버인지 확인
+        if (!room.getUser1Id().equals(user.getId())
+                && !room.getUser2Id().equals(user.getId())) {
+            throw new ResourceNotFoundException("채팅방 접근 권한이 없습니다.");
+        }
+
+        // 읽음 상태 업데이트
+        DirectChatReadStatus readStatus = readStatusRepository
+                .findByChatRoomAndUserId(room, user.getId())
+                .orElseGet(() ->
+                        readStatusRepository.save(
+                                new DirectChatReadStatus(room, user.getId())
+                        )
+                );
+
+        // 이전에 읽은 메시지보다 새로운 메시지인 경우에만 업데이트
+        DirectChatMessage prevReadMessage = readStatus.getLastReadMessage();
+        if (prevReadMessage == null || message.getId() > prevReadMessage.getId()) {
+            readStatus.updateRead(message);
+            readStatusRepository.save(readStatus);
+        }
     }
 }

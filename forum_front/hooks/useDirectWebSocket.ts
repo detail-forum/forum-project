@@ -3,24 +3,23 @@ import { Client, IMessage } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import { store } from '@/store/store'
 import { getCookie } from '@/utils/cookies'
+import type { DirectChatMessageDTO } from '@/types/api'
 
-interface UseWebSocketOptions {
-  groupId: number
-  roomId: number
-  onMessage?: (message: any) => void
+interface UseDirectWebSocketOptions {
+  roomId: number | null
+  onMessage?: (message: DirectChatMessageDTO) => void
   onTyping?: (data: { username: string; isTyping: boolean }) => void
-  onRead?: (data: { messageId: number; username: string; readCount: number }) => void
+  onRead?: (data: { messageId: number; username: string; isRead: boolean }) => void
   enabled?: boolean
 }
 
-export function useWebSocket({
-  groupId,
+export function useDirectWebSocket({
   roomId,
   onMessage,
   onTyping,
   onRead,
   enabled = true,
-}: UseWebSocketOptions) {
+}: UseDirectWebSocketOptions) {
   const [isConnected, setIsConnected] = useState(false)
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const clientRef = useRef<Client | null>(null)
@@ -48,7 +47,7 @@ export function useWebSocket({
   }, [])
 
   useEffect(() => {
-    if (!enabled || !groupId || !roomId) return
+    if (!enabled || !roomId) return
 
     const token = getToken()
     if (!token) {
@@ -63,7 +62,7 @@ export function useWebSocket({
     // SockJS는 상대 경로를 사용하므로 전체 URL 구성
     const socketUrl = `${baseUrl}/ws`
     
-    console.log('WebSocket 연결 시도:', socketUrl)
+    console.log('일반 채팅 WebSocket 연결 시도:', socketUrl)
 
     const client = new Client({
       webSocketFactory: () => {
@@ -83,7 +82,7 @@ export function useWebSocket({
       },
       onConnect: () => {
         setIsConnected(true)
-        console.log('WebSocket 연결 성공')
+        console.log('일반 채팅 WebSocket 연결 성공')
         
         if (!clientRef.current) return
 
@@ -97,19 +96,17 @@ export function useWebSocket({
         })
         subscriptionsRef.current = []
 
-        // 채팅방 메시지 구독
+        // 일반 채팅방 메시지 구독
         const messageSubscription = clientRef.current.subscribe(
-          `/topic/chat/${groupId}/${roomId}`,
+          `/topic/direct/${roomId}`,
           (message: IMessage) => {
             try {
-              console.log('메시지 수신 (원본):', message)
-              console.log('메시지 수신 (body):', message.body)
-              console.log('메시지 수신 (headers):', message.headers)
-              const data = JSON.parse(message.body)
-              console.log('파싱된 메시지 데이터:', data)
+              console.log('일반 채팅 메시지 수신:', message.body)
+              const data = JSON.parse(message.body) as DirectChatMessageDTO
+              console.log('파싱된 일반 채팅 메시지 데이터:', data)
               onMessageRef.current?.(data)
             } catch (error) {
-              console.error('메시지 파싱 오류:', error, message.body)
+              console.error('일반 채팅 메시지 파싱 오류:', error, message.body)
             }
           },
           {
@@ -117,11 +114,11 @@ export function useWebSocket({
           }
         )
         subscriptionsRef.current.push(messageSubscription)
-        console.log('메시지 구독 완료:', `/topic/chat/${groupId}/${roomId}`, messageSubscription)
+        console.log('일반 채팅 메시지 구독 완료:', `/topic/direct/${roomId}`)
 
         // 타이핑 인디케이터 구독
         const typingSubscription = clientRef.current.subscribe(
-          `/topic/chat/${groupId}/${roomId}/typing`,
+          `/topic/direct/${roomId}/typing`,
           (message: IMessage) => {
             try {
               const data = JSON.parse(message.body)
@@ -167,7 +164,7 @@ export function useWebSocket({
 
         // 읽음 표시 구독
         const readSubscription = clientRef.current.subscribe(
-          `/topic/chat/${groupId}/${roomId}/read`,
+          `/topic/direct/${roomId}/read`,
           (message: IMessage) => {
             try {
               const data = JSON.parse(message.body)
@@ -181,7 +178,7 @@ export function useWebSocket({
       },
       onDisconnect: () => {
         setIsConnected(false)
-        console.log('WebSocket 연결 종료')
+        console.log('일반 채팅 WebSocket 연결 종료')
         // 구독 정리
         subscriptionsRef.current = []
       },
@@ -192,13 +189,9 @@ export function useWebSocket({
           headers: frame.headers,
           body: frame.body,
         })
-        // STOMP 오류 시에도 연결 상태는 유지하고 재연결 시도
-        // setIsConnected(false) 제거하여 자동 재연결 허용
       },
       onWebSocketError: (event) => {
         console.error('WebSocket 오류:', event)
-        // WebSocket 오류 시에도 재연결 시도
-        // setIsConnected(false) 제거하여 자동 재연결 허용
       },
     })
 
@@ -230,9 +223,9 @@ export function useWebSocket({
         clientRef.current = null
       }
     }
-  }, [groupId, roomId, enabled, getToken]) // 콜백 함수 의존성 제거
+  }, [roomId, enabled, getToken])
 
-  const sendMessage = useCallback((message: string, replyToMessageId?: number) => {
+  const sendMessage = useCallback((message: string) => {
     if (!clientRef.current) {
       console.error('WebSocket 클라이언트가 없습니다.')
       return false
@@ -243,53 +236,55 @@ export function useWebSocket({
       return false
     }
     
+    if (!roomId) {
+      console.error('roomId가 없습니다.')
+      return false
+    }
+    
     try {
-      const destination = `/app/chat/${groupId}/${roomId}/send`
-      const payload: any = { message }
-      if (replyToMessageId) {
-        payload.replyToMessageId = replyToMessageId
-      }
+      const destination = `/app/direct/${roomId}/send`
+      const payload = { message }
       const body = JSON.stringify(payload)
-      console.log('메시지 전송:', { destination, body, connected: clientRef.current.connected })
+      console.log('일반 채팅 메시지 전송:', { destination, body, connected: clientRef.current.connected })
       
       clientRef.current.publish({
         destination,
         body,
       })
-      console.log('메시지 전송 완료')
+      console.log('일반 채팅 메시지 전송 완료')
       return true
     } catch (error) {
-      console.error('메시지 전송 중 오류:', error)
+      console.error('일반 채팅 메시지 전송 중 오류:', error)
       return false
     }
-  }, [groupId, roomId])
+  }, [roomId])
 
   const startTyping = useCallback(() => {
-    if (clientRef.current && clientRef.current.connected) {
+    if (clientRef.current && clientRef.current.connected && roomId) {
       clientRef.current.publish({
-        destination: `/app/chat/${groupId}/${roomId}/typing/start`,
+        destination: `/app/direct/${roomId}/typing/start`,
         body: JSON.stringify({}),
       })
     }
-  }, [groupId, roomId])
+  }, [roomId])
 
   const stopTyping = useCallback(() => {
-    if (clientRef.current && clientRef.current.connected) {
+    if (clientRef.current && clientRef.current.connected && roomId) {
       clientRef.current.publish({
-        destination: `/app/chat/${groupId}/${roomId}/typing/stop`,
+        destination: `/app/direct/${roomId}/typing/stop`,
         body: JSON.stringify({}),
       })
     }
-  }, [groupId, roomId])
+  }, [roomId])
 
   const markAsRead = useCallback((messageId: number) => {
-    if (clientRef.current && clientRef.current.connected) {
+    if (clientRef.current && clientRef.current.connected && roomId) {
       clientRef.current.publish({
-        destination: `/app/chat/${groupId}/${roomId}/read`,
+        destination: `/app/direct/${roomId}/read`,
         body: JSON.stringify({ messageId }),
       })
     }
-  }, [groupId, roomId])
+  }, [roomId])
 
   return {
     isConnected,
