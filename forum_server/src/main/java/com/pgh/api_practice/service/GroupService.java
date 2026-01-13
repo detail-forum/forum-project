@@ -781,10 +781,8 @@ public class GroupService {
             throw new ApplicationUnauthorizedException("모임 멤버만 채팅방을 조회할 수 있습니다.");
         }
 
-        if (room.isAdminRoom()) {
-            if (!isAdmin(group, groupId, currentUser)) {
-                throw new ApplicationUnauthorizedException("관리자만 관리자 채팅방을 조회할 수 있습니다.");
-            }
+        if (room.isAdminRoom() && !isAdmin(group, groupId, currentUser)) {
+            throw new ApplicationUnauthorizedException("관리자만 관리자 채팅방을 조회할 수 있습니다.");
         }
 
         Pageable pageable = PageRequest.of(page, size);
@@ -796,7 +794,7 @@ public class GroupService {
         }
 
     /* ===============================
-       읽음 처리 (null-safe)
+       읽음 처리 (완전 방어)
        =============================== */
         if (currentUser != null) {
             Long lastReadMessageId = messages.get(messages.size() - 1).getId();
@@ -815,7 +813,7 @@ public class GroupService {
         }
 
     /* ===============================
-       사전 데이터 일괄 조회 (방어)
+       사전 데이터 구성 (운영용 방어)
        =============================== */
 
         List<Long> messageIds = messages.stream()
@@ -823,54 +821,68 @@ public class GroupService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        // 그룹 멤버 displayName Map (null-safe)
+        // displayNameMap (Collectors.toMap 제거)
         List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
-        var displayNameMap = new HashMap<Long, String>();
+        Map<Long, String> displayNameMap = new HashMap<>();
 
         for (GroupMember gm : members) {
             if (gm == null || gm.getUser() == null || gm.getUser().getId() == null) continue;
 
             String dn = gm.getDisplayName();
-            if (dn == null) dn = "";
-
-            displayNameMap.putIfAbsent(gm.getUser().getId(), dn);
+            displayNameMap.putIfAbsent(gm.getUser().getId(), dn != null ? dn : "");
         }
 
-        // 관리자 ID Set (null-safe)
-        var adminIds = members.stream()
-                .filter(Objects::nonNull)
-                .filter(gm -> gm.getUser() != null && gm.getUser().getId() != null)
-                .filter(GroupMember::isAdmin)
-                .map(gm -> gm.getUser().getId())
-                .collect(Collectors.toSet());
-
+        // adminIds (owner null 방어)
+        Set<Long> adminIds = new HashSet<>();
+        for (GroupMember gm : members) {
+            if (gm == null || gm.getUser() == null || gm.getUser().getId() == null) continue;
+            if (gm.isAdmin()) {
+                adminIds.add(gm.getUser().getId());
+            }
+        }
         if (group.getOwner() != null && group.getOwner().getId() != null) {
             adminIds.add(group.getOwner().getId());
         }
 
-        // 반응 count Map
-        var reactionCountMap = messageReactionRepository
-                .countByMessageIdsGroupByEmoji(messageIds)
-                .stream()
-                .collect(Collectors.groupingBy(
-                        row -> (Long) row[0],
-                        Collectors.mapping(
-                                row -> new GroupChatMessageDTO.ReactionInfo(
-                                        (String) row[1],
-                                        ((Number) row[2]).intValue()
-                                ),
-                                Collectors.toList()
-                        )
-                ));
+    /* ===============================
+       반응 집계 (운영 DB 타입 방어)
+       =============================== */
 
-        // 내 반응 Map
-        var myReactionMap = new HashMap<Long, List<String>>();
+        Map<Long, List<GroupChatMessageDTO.ReactionInfo>> reactionCountMap = new HashMap<>();
+
+        messageReactionRepository
+                .countByMessageIdsGroupByEmoji(messageIds)
+                .forEach(row -> {
+                    if (row == null || row.length < 3) return;
+
+                    Long msgId = row[0] instanceof Number ? ((Number) row[0]).longValue() : null;
+                    String emoji = row[1] != null ? row[1].toString() : null;
+                    Integer count = row[2] instanceof Number ? ((Number) row[2]).intValue() : 0;
+
+                    if (msgId == null || emoji == null) return;
+
+                    reactionCountMap
+                            .computeIfAbsent(msgId, k -> new ArrayList<>())
+                            .add(new GroupChatMessageDTO.ReactionInfo(emoji, count));
+                });
+
+    /* ===============================
+       내 반응 (운영 DB 타입 방어)
+       =============================== */
+
+        Map<Long, List<String>> myReactionMap = new HashMap<>();
+
         if (currentUser != null) {
             messageReactionRepository
                     .findMyReactions(messageIds, currentUser.getId())
                     .forEach(row -> {
-                        Long msgId = (Long) row[0];
-                        String emoji = (String) row[1];
+                        if (row == null || row.length < 2) return;
+
+                        Long msgId = row[0] instanceof Number ? ((Number) row[0]).longValue() : null;
+                        String emoji = row[1] != null ? row[1].toString() : null;
+
+                        if (msgId == null || emoji == null) return;
+
                         myReactionMap
                                 .computeIfAbsent(msgId, k -> new ArrayList<>())
                                 .add(emoji);
@@ -878,20 +890,22 @@ public class GroupService {
         }
 
     /* ===============================
-       DTO 변환 (핵심 NPE 방어)
+       DTO 변환 (NPE 완전 제거)
        =============================== */
+
         return messages.stream()
                 .map(msg -> {
 
                     Users user = msg.getUser();
                     if (user == null || user.getId() == null) {
-                        return null; // 작성자 없는 메시지는 스킵
+                        return null; // 작성자 없는 메시지 스킵
                     }
 
                     GroupChatMessageDTO.ReplyToMessageInfo replyInfo = null;
+
                     if (msg.getReplyToMessage() != null) {
                         GroupChatMessage reply = msg.getReplyToMessage();
-                        Users replyUser = (reply != null ? reply.getUser() : null);
+                        Users replyUser = reply != null ? reply.getUser() : null;
 
                         if (reply != null && replyUser != null && replyUser.getId() != null) {
                             replyInfo = GroupChatMessageDTO.ReplyToMessageInfo.builder()
