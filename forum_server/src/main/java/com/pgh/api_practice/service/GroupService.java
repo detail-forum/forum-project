@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -1032,11 +1033,24 @@ public class GroupService {
    권한 판별 공통 메서드
    ========================= */
     private Users requireUser() {
-        Users user = getCurrentUser();
-        if (user == null) {
-            throw new ApplicationUnauthorizedException("인증이 필요합니다.");
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null || auth.getPrincipal() == null) {
+            throw new ApplicationUnauthorizedException("인증 정보가 없습니다.");
         }
-        return user;
+
+        Object principal = auth.getPrincipal();
+
+        if (principal instanceof Users users) {
+            return users;
+        }
+
+        if (principal instanceof String username) {
+            return userRepository.findByUsername(username)
+                    .orElseThrow(() -> new ApplicationUnauthorizedException("사용자를 찾을 수 없습니다."));
+        }
+
+        throw new ApplicationUnauthorizedException("지원하지 않는 인증 타입입니다.");
     }
 
     private boolean isOwner(Group group, Users user) {
