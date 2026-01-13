@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Set;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -21,6 +22,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenProvider tokenProvider;          // validateToken, getUsername 제공
     private final UserDetailsService userDetailsService;
+
+    private static final Set<String> SKIP_PATHS = Set.of(
+            "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/reissue",
+            "/swagger-ui",
+            "/swagger-ui.html",
+            "/api-docs",
+            "/v3/api-docs"
+    );
 
     @Override
     protected void doFilterInternal(
