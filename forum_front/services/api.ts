@@ -123,8 +123,9 @@ apiClient.interceptors.response.use(
       const state = store.getState()
       const refreshToken = state.auth.refreshToken
 
+      // RefreshToken이 없으면 재발급 요청을 보내지 않고 바로 로그아웃
       if (!refreshToken) {
-        // RefreshToken이 없으면 로그아웃 (인증 확인 API가 아닌 경우에만)
+        console.warn('RefreshToken이 없습니다. 로그인이 필요합니다.')
         processQueue(error)
         isRefreshing = false
         removeCookie('accessToken')
@@ -150,15 +151,15 @@ apiClient.interceptors.response.use(
         return Promise.reject(error)
       }
       
-      // RefreshToken이 만료되었는지 확인
+      // RefreshToken이 만료되었는지 확인 (만료되었으면 재발급 요청을 보내지 않음)
       if (isTokenExpired(refreshToken)) {
+        console.warn('RefreshToken이 만료되었습니다. 다시 로그인해주세요.')
         processQueue(error)
         isRefreshing = false
         removeCookie('accessToken')
         removeCookie('refreshToken')
         store.dispatch(logout())
         
-        console.warn('RefreshToken이 만료되었습니다. 다시 로그인해주세요.')
         // 현재 경로가 홈이 아닌 경우에만 리다이렉트 (무한 루프 방지)
         if (typeof window !== 'undefined' && window.location.pathname !== '/') {
           window.location.href = '/'
@@ -168,10 +169,15 @@ apiClient.interceptors.response.use(
 
       try {
         // RefreshToken으로 새 AccessToken 발급
+        // refreshToken이 반드시 있어야 하므로 명시적으로 체크
+        if (!refreshToken) {
+          throw new Error('RefreshToken이 없습니다.')
+        }
+
         // 서버가 쿠키에서 refreshToken을 읽을 수 있지만, 호환성을 위해 body에도 포함
         const response = await axios.post<ApiResponse<LoginResponse>>(
           `${API_BASE_URL}/auth/refresh`,
-          refreshToken ? { refreshToken } as RefreshTokenRequest : {},
+          { refreshToken } as RefreshTokenRequest,
           { withCredentials: true }
         )
 
@@ -209,7 +215,7 @@ apiClient.interceptors.response.use(
           throw new Error('토큰 재발급 실패')
         }
       } catch (refreshError: any) {
-        // RefreshToken도 만료되었거나 유효하지 않음
+        // RefreshToken도 만료되었거나 유효하지 않음 (403, 401 등)
         processQueue(refreshError as AxiosError)
         isRefreshing = false
         removeCookie('accessToken')
@@ -221,7 +227,17 @@ apiClient.interceptors.response.use(
                             refreshError?.message || 
                             '세션이 만료되었습니다. 다시 로그인해주세요.'
         
-        console.warn('토큰 재발급 실패:', errorMessage)
+        console.warn('토큰 재발급 실패:', {
+          status: refreshError?.response?.status,
+          statusText: refreshError?.response?.statusText,
+          message: errorMessage,
+          url: refreshError?.config?.url
+        })
+        
+        // 403 또는 401 에러인 경우 명확히 로그인 필요 메시지 표시
+        if (refreshError?.response?.status === 403 || refreshError?.response?.status === 401) {
+          console.warn('토큰 재발급이 거부되었습니다. 다시 로그인해주세요.')
+        }
         
         // 사용자에게 알림 표시 (페이지 이동 전에 표시)
         if (typeof window !== 'undefined') {
@@ -229,9 +245,13 @@ apiClient.interceptors.response.use(
           setTimeout(() => {
             alert(errorMessage)
           }, 100)
+          
+          // 현재 경로가 홈이 아닌 경우에만 리다이렉트 (무한 루프 방지)
+          if (window.location.pathname !== '/') {
+            window.location.href = '/'
+          }
         }
         
-        window.location.href = '/'
         return Promise.reject(refreshError)
       }
     }
