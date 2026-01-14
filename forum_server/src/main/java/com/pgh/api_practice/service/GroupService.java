@@ -7,6 +7,7 @@ import com.pgh.api_practice.exception.ApplicationUnauthorizedException;
 import com.pgh.api_practice.exception.ResourceNotFoundException;
 import com.pgh.api_practice.repository.*;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class GroupService {
@@ -1041,10 +1043,12 @@ public class GroupService {
 
         Object principal = auth.getPrincipal();
 
+        // 1. Users 엔티티가 그대로 principal인 경우
         if (principal instanceof Users users) {
             return users;
         }
 
+        // 2. username(String)만 들어있는 경우
         if (principal instanceof String username) {
             return userRepository.findByUsername(username)
                     .orElseThrow(() ->
@@ -1052,6 +1056,16 @@ public class GroupService {
                     );
         }
 
+        // 3. UserDetails 기반 인증 (Spring Security 기본 / JWT 필터에서 가장 흔함)
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails userDetails) {
+            String username = userDetails.getUsername();
+            return userRepository.findByUsername(username)
+                    .orElseThrow(() ->
+                            new ApplicationUnauthorizedException("사용자를 찾을 수 없습니다.")
+                    );
+        }
+
+        // 4. 그 외 예상하지 못한 타입
         throw new ApplicationUnauthorizedException("알 수 없는 인증 주체입니다.");
     }
 
