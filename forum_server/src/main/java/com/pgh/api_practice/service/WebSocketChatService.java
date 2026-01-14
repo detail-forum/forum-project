@@ -15,6 +15,7 @@ import com.pgh.api_practice.repository.MessageReactionRepository;
 import com.pgh.api_practice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class WebSocketChatService {
 
+    private final SimpMessagingTemplate messagingTemplate;
     private final GroupChatMessageRepository messageRepository;
     private final GroupChatRoomRepository roomRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -268,5 +270,30 @@ public class WebSocketChatService {
                     .build();
             reactionRepository.save(reaction);
         }
+    }
+
+    @Transactional
+    public void sendMessageViaWebSocket(
+            Long groupId,
+            Long roomId,
+            String message,
+            String username,
+            Long replyToMessageId
+    ) {
+        // 1. 메시지 저장 + DTO 생성 (기존 로직 재사용)
+        GroupChatMessageDTO dto =
+                saveAndGetMessage(
+                        groupId,
+                        roomId,
+                        message,
+                        username,
+                        replyToMessageId
+                );
+
+        // 2. WebSocket 브로드캐스트
+        messagingTemplate.convertAndSend(
+                "/topic/chat/" + groupId + "/" + roomId,
+                dto
+        );
     }
 }

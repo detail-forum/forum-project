@@ -55,18 +55,12 @@ public class WebSocketChatController {
                             : Long.parseLong(replyObj.toString());
         }
 
-        GroupChatMessageDTO dto =
-                chatService.saveAndGetMessage(
-                        groupId,
-                        roomId,
-                        message,
-                        principal.getName(),
-                        replyToMessageId
-                );
-
-        messagingTemplate.convertAndSend(
-                "/topic/chat/" + groupId + "/" + roomId,
-                dto
+        chatService.sendMessageViaWebSocket(
+                groupId,
+                roomId,
+                message,
+                principal.getName(),
+                replyToMessageId
         );
     }
 
@@ -154,33 +148,10 @@ public class WebSocketChatController {
         if (principal == null) return;
         if (!"MESSAGE".equals(request.getType())) return;
 
-        DirectChatMessageDTO saved =
-                directChatService.sendMessageViaWebSocket(
-                        roomId,
-                        request.getMessage(),
-                        principal.getName()
-                );
-
-        DirectChatMessageResponse response =
-                DirectChatMessageResponse.builder()
-                        .type("MESSAGE")
-                        .id(saved.getId())
-                        .chatRoomId(roomId)
-                        .message(saved.getMessage())
-                        .username(saved.getUsername())
-                        .nickname(saved.getNickname())
-                        .displayName(null)
-                        .profileImageUrl(saved.getProfileImageUrl())
-                        .createdTime(saved.getCreatedTime())
-                        .messageType(saved.getMessageType().name())
-                        .fileUrl(saved.getFileUrl())
-                        .fileName(saved.getFileName())
-                        .fileSize(saved.getFileSize())
-                        .build();
-
-        messagingTemplate.convertAndSend(
-                "/topic/direct/" + roomId,
-                response
+        directChatService.sendMessageViaWebSocket(
+                roomId,
+                request.getMessage(),
+                principal.getName()
         );
     }
 
